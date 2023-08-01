@@ -1,0 +1,38 @@
+---
+title: "summarize_segmentation"
+author: "David C. King"
+date: "2023-07-21"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(magrittr)
+library(dplyr)
+library(ggplot2)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r data file}
+segmentation = read.table('all_segmentation_results.csv', sep=',', header=T)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r filtermunge}
+segmentation %<>% filter(Worm != '7-8')
+segmentation %<>% mutate(Rep = as.factor(Rep), Worm = factor(Worm,levels=1:11), RNAi=factor(RNAi, levels=rev(sort(unique(segmentation$RNAi)))))
+```
+
+```{r plot}
+ggplot(segmentation, aes(x=x, y=y, color=Genotype)) + geom_line() + geom_point() + facet_wrap(~RNAi + Worm)
+```
+
