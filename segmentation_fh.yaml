@@ -1,0 +1,15 @@
+name: segmentation
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3
+  - matplotlib
+  - scipy
+  - numpy
+  - scikit-image
+  - opencv-python-headless
+  - cellpose==2.0
+  - trackpy
+prefix: /Users/david/opt/miniconda3/envs/segmentation
