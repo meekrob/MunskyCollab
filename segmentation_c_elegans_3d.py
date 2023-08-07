@@ -36,7 +36,8 @@ from skimage.measure import label, regionprops
 # 
 from skimage.morphology import square, dilation
 from skimage import measure
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, center_of_mass
+from scipy.spatial import distance
 # 
 # ! pip install opencv-python-headless==4.7.0.72
 # ! pip install cellpose==2.0
@@ -50,57 +51,15 @@ print()
 #@title Function to import data from dropbox (double-click to show code)
 
 
-def file_path_extraction(dropbox_link):
-  
-  '''
-  This function is inteded to download and uncompress the data given in a dropbox_link
-  '''
-  start = dropbox_link.rindex( '/' )                          # Extraxting folder name after detecting the last "\".
-  end = dropbox_link.index( '.zip?', start )                  # Extracting folder name after finding '.zip' on string.
 
-  folder_name = dropbox_link[start+1:end]                     # Folder name
-  compress_folder_name = folder_name +'.zip'                  # compressed folder name
-
-  drive = pathlib.Path("/content")                            # Storage folder in colab
-  found_files = list(drive.glob('**/'+compress_folder_name))  #
-
-  print(found_files)
-
-  if len(found_files) != 0:
-    print(f"File already downloaded and can be found in {found_files[0]}.")
-    command_unzip = f"unzip {compress_folder_name}"
-    os.system(command_unzip)
-  else:
-    command_download = f"wget --no-check-certificate {dropbox_link} -r -A \'uc*\' -e robots=off -nd -O {compress_folder_name}"
-    command_unzip = f"unzip {compress_folder_name}"
-    os.system(command_download)
-    os.system(command_unzip)
-  # Deffine your directory paths
-  current_dir = pathlib.Path().absolute()
-  path_input = current_dir.joinpath(folder_name)
-  # Reads the folder with the results and import the simulations as lists
-  list_files_names = sorted([f for f in listdir(path_input) if isfile(join(path_input, f)) and ('.tif') in f], key=str.lower)  # reading all tif files in the folder
-  list_files_names.sort(key=lambda f: int(re.sub('\D', '', f)))  # sorting the index in numerical order
-  path_files = [ str(path_input.joinpath(f).resolve()) for f in list_files_names ] # creating the complete path for each file
-
-  list_images = [imread(str(f)) for f in path_files]
-  # Reading the microscopy data
-  number_images = len(path_files)
-  print('Number of images in file: ', number_images)
-  return path_input, path_files,list_images
-
-# Downloading data from a Dropbox links
-# dropbox_link ='https://www.dropbox.com/s/rik27sljw86wdsm/OneDrive_1_7-18-2023.zip?dl=0'
-#path_dir, path_files,list_images = file_path_extraction(dropbox_link)
-
-# Switching to a command line approach, using Luis's code from above
-# get target path from sys.argv[1]
-#
 import sys
 
 print("reading directory")
 
-path_dir = sys.argv[1]
+if len(sys.argv) > 1:
+  path_dir = sys.argv[1]
+else:
+   path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
 
 
 # figure out provenance/ID from path info
@@ -211,17 +170,30 @@ masks_total = np.zeros_like(max_Brightfield)
 
 import time
 total_time = 0
-for i,diameter in enumerate (list_ranges):
-  begin_time = time.time()
-  print("model.eval(max_Brightfield ... %d/%d " % (i+1,len(list_ranges)), flush=True, end='')
 
-  masks = model.eval(max_Brightfield, diameter=diameter, flow_threshold=1, channels=[0,0], net_avg=True, augment=True)[0]
-  masks_total = masks_total+ masks
+import pickle
+pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{repnum}_mask.pickle")
 
-  end_time = time.time()
-  total_time += end_time - begin_time
-  print(round(end_time - begin_time), "seconds.", round(total_time), "total.")
+if os.path.exists( pickled_mask_path ):
+   print("reading pickle", end="")
+   with open(pickled_mask_path, "rb") as inpickle:
+    masks_total = pickle.load(inpickle)
+   print("done")
+else:
+  print("calculating mask")
+  for i,diameter in enumerate (list_ranges):
+    begin_time = time.time()
+    print("model.eval(max_Brightfield ... %d/%d " % (i+1,len(list_ranges)), flush=True, end='')
 
+    masks = model.eval(max_Brightfield, diameter=diameter, flow_threshold=1, channels=[0,0], net_avg=True, augment=True)[0]
+    masks_total = masks_total+ masks
+
+    end_time = time.time()
+    total_time += end_time - begin_time
+    print(round(end_time - begin_time), "seconds.", round(total_time), "total.")
+  with open(pickled_mask_path,"wb") as outpickle:
+     pickle.dump(masks_total, outpickle)
+     print("wrote", pickled_mask_path)
 
 print("Total time: %d seconds" % round(total_time))
 
@@ -251,6 +223,10 @@ for prop in props:
         final_mask[coords[:, 0], coords[:, 1]] = 1
 # Mask by image
 segmented_image = np.multiply(final_mask,max_Brightfield)
+
+# Find center of mass
+cm = center_of_mass(segmented_image)
+
 # Plotting
 fig, ax = plt.subplots(1,3, figsize=(15, 5))
 # Plotting the heatmap of a section in the image
@@ -261,7 +237,7 @@ ax[0].set(title='brightfield'); ax[0].axis('on');ax[0].grid(False)
 ax[1].set(title='Mask'); ax[1].axis('on');ax[1].grid(False)
 ax[2].set(title='brightfield * mask'); ax[2].axis('on');ax[0].grid(False)
 plt.close()
-plt.savefig('mask.png') ;
+plt.savefig('mask.png')
 #plt.show()
 
 """# Nuclei segmentation using trackpy"""
@@ -287,7 +263,7 @@ plt.savefig('histogram.png')
 
 plt.figure(figsize=(5,4))
 spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
-#tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
+# tp.annotate(spots_detected_dataframe,"tp_annotate.png",plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
 
 plt.close()
 plt.savefig('spots_detected_dataframe.png')
@@ -296,7 +272,12 @@ spots_detected_dataframe['Worm'] = wormnumber
 spots_detected_dataframe['Rep'] = repnum
 spots_detected_dataframe['RNAi'] = RNAi
 spots_detected_dataframe['Genotype'] = genotype
-spots_detected_dataframe.to_csv(f"{datestr}_{genotype}_{RNAi}_{repnum}_segmented.csv")
+
+rel_to_center = spots_detected_dataframe.loc[:,['x','y']]-cm
+spots_detected_dataframe['x_rel_to_center'] = rel_to_center.iloc[:,0]
+spots_detected_dataframe['y_rel_to_center'] = rel_to_center.iloc[:,1]
+spots_detected_dataframe['distance_from_center'] = (rel_to_center**2).sum(axis=1)**.5 # euclidean
+spots_detected_dataframe.to_csv(f"{datestr}_{genotype}_{RNAi}_{repnum}_dist_segmented.csv")
 
 number_of_detected_cells = len(spots_detected_dataframe)
 number_of_detected_cells
@@ -321,8 +302,3 @@ ax.set(xlabel='nuclei size', ylabel='count')
 plt.close()
 plt.savefig('nucleisize.png')
 #plt.show()
-
-# CSV file column information
-
-# Worm_ID
-
