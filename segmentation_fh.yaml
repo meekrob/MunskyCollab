@@ -1,5 +1,6 @@
 name: segmentation
 channels:
+  - fastai
   - bioconda
   - conda-forge
   - defaults
