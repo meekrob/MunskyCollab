@@ -176,7 +176,7 @@ total_time = 0
 pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{repnum}_mask.pickle")
 
 if os.path.exists( pickled_mask_path ):
-   print("reading pickle", end=" ")
+   print("reading pickle...", end=" ")
    with open(pickled_mask_path, "rb") as inpickle:
     masks_total = pickle.load(inpickle)
    print("done")
@@ -193,11 +193,12 @@ else:
     total_time += end_time - begin_time
     print(round(end_time - begin_time), "seconds.", round(total_time), "total.")
   with open(pickled_mask_path,"wb") as outpickle:
+     print("writing", pickled_mask_path, "...", end="")
      pickle.dump(masks_total, outpickle)
-     print("wrote", pickled_mask_path)
+     print("done")
 
 print("Total time: %d seconds" % round(total_time))
-sys.exit(0)
+#sys.exit(0)
 # Binarization
 print("Binarization")
 new_mask = masks_total.copy()
