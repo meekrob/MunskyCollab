@@ -10,6 +10,10 @@ Measure the intensity of nuclei individually.
 import sys
 import pathlib  # Library to work with file paths
 import os; from os import listdir; from os.path import isfile, join
+import re
+import glob
+from skimage.io import imread        # Module from skimage to read images as numpy arrays
+
 print("reading directory")
 
 if len(sys.argv) > 1:
@@ -58,12 +62,9 @@ import random                        # Library to generate random numbers
 import skimage                       # Library for image manipulation
 import numpy as np                   # Library for array manipulation
 import matplotlib.pyplot as plt      # Library used for plotting
-from skimage.io import imread        # Module from skimage to read images as numpy arrays
+
 from skimage.filters import gaussian # Module working with a gaussian filter
 
-
-import re
-import glob
 from skimage.measure import label, regionprops
 # 
 from skimage.morphology import square, dilation
