@@ -30,6 +30,7 @@ from skimage.io import imread        # Module from skimage to read images as num
 from skimage.filters import gaussian # Module working with a gaussian filter
 import pathlib                              # Library to work with file paths
 import os; from os import listdir; from os.path import isfile, join
+
 import re
 import glob
 from skimage.measure import label, regionprops
@@ -38,6 +39,11 @@ from skimage.morphology import square, dilation
 from skimage import measure
 from scipy.ndimage import gaussian_filter, center_of_mass
 from scipy.spatial import distance
+
+# for the cellpose step (calculating the mask), time the passes through the loop, save the data to skip the processing in
+# future invocations
+import time
+import pickle
 # 
 # ! pip install opencv-python-headless==4.7.0.72
 # ! pip install cellpose==2.0
@@ -66,7 +72,12 @@ else:
 #i.e.: path_dir = 32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1
 longname,RNAi,stage,shortname = path_dir.split(os.path.sep)[-4:]
 # i.e.  201124_JM259_elt-2_Promoter_Rep_1, ELT-2_RNAi, L1, JM259_L1_ELT-2_worm_1
-datestr, genotype, labl, _, __, repnum = longname.split('_')
+try:
+  datestr, genotype, labl, _, __, repnum = longname.split('_')
+except ValueError:
+  print("Error parsing", longname)
+  raise
+ 
 wormnumber = shortname.split('_')[-1]
 
 os.chdir(path_dir)
@@ -167,15 +178,11 @@ list_ranges =np.linspace(20, 300, 10, dtype='int')  #[50,100,150,200,250]
 list_masks = []
 masks_total = np.zeros_like(max_Brightfield)
 
-
-import time
 total_time = 0
-
-import pickle
 pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{repnum}_mask.pickle")
 
 if os.path.exists( pickled_mask_path ):
-   print("reading pickle", end="")
+   print("reading pickle", end=" ")
    with open(pickled_mask_path, "rb") as inpickle:
     masks_total = pickle.load(inpickle)
    print("done")
@@ -183,7 +190,7 @@ else:
   print("calculating mask")
   for i,diameter in enumerate (list_ranges):
     begin_time = time.time()
-    print("model.eval(max_Brightfield ... %d/%d " % (i+1,len(list_ranges)), flush=True, end='')
+    print("\tmodel.eval(max_Brightfield ...) %d/%d " % (i+1,len(list_ranges)), flush=True, end='')
 
     masks = model.eval(max_Brightfield, diameter=diameter, flow_threshold=1, channels=[0,0], net_avg=True, augment=True)[0]
     masks_total = masks_total+ masks
@@ -196,7 +203,7 @@ else:
      print("wrote", pickled_mask_path)
 
 print("Total time: %d seconds" % round(total_time))
-
+sys.exit(0)
 # Binarization
 print("Binarization")
 new_mask = masks_total.copy()
