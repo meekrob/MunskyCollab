@@ -8,6 +8,8 @@ Identify nuclei that are flourescing.
 Measure the intensity of nuclei individually.
 """
 import sys
+import pathlib  # Library to work with file paths
+import os; from os import listdir; from os.path import isfile, join
 print("reading directory")
 
 if len(sys.argv) > 1:
@@ -58,8 +60,7 @@ import numpy as np                   # Library for array manipulation
 import matplotlib.pyplot as plt      # Library used for plotting
 from skimage.io import imread        # Module from skimage to read images as numpy arrays
 from skimage.filters import gaussian # Module working with a gaussian filter
-import pathlib                              # Library to work with file paths
-import os; from os import listdir; from os.path import isfile, join
+
 
 import re
 import glob
