@@ -238,9 +238,8 @@ ax[2].imshow(segmented_image,cmap=color_map)
 ax[0].set(title='brightfield'); ax[0].axis('on');ax[0].grid(False)
 ax[1].set(title='Mask'); ax[1].axis('on');ax[1].grid(False)
 ax[2].set(title='brightfield * mask'); ax[2].axis('on');ax[0].grid(False)
-plt.close()
 plt.savefig('mask.png')
-#plt.show()
+plt.close()
 
 """# Nuclei segmentation using trackpy"""
 print("Nuclei segmentation using trackpy")
@@ -261,7 +260,7 @@ ax.hist(spots_detected_dataframe_all['mass'], bins=50, color = "orangered", ec="
 ax.set(xlabel='mass', ylabel='count')
 plt.close(fig)
 plt.savefig('histogram.png')
-#plt.show()
+plt.close()
 
 #plt.figure(figsize=(5,4))
 spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
