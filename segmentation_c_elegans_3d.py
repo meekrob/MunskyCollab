@@ -263,9 +263,11 @@ plt.close(fig)
 plt.savefig('histogram.png')
 #plt.show()
 
-plt.figure(figsize=(5,4))
+#plt.figure(figsize=(5,4))
 spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
-# tp.annotate(spots_detected_dataframe,"tp_annotate.png",plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
+img = tp.annotate(spots_detected_dataframe, image=GFP, plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
+            
+img.figure.savefig(f"{datestr}_{genotype}_{RNAi}_{repnum}_annotated.png")      
 
 plt.close()
 plt.savefig('spots_detected_dataframe.png')
