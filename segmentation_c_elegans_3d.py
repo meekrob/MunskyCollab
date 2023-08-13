@@ -20,7 +20,7 @@ DO_MULTI = True
 def do_mask_mp(arglist):
   model, max_Brightfield, diameter, flow_threshold, channels, net_avg, augment, thread_number = arglist
   pid = os.getpid()
-  print(f"Starting task: {thread_number} {pid}", flush=True)
+  print(f"Starting task: {thread_number} on {pid}. diameter ${diameter}. ", flush=True)
   
   begin_time = time.time()
   masks = model.eval(max_Brightfield, 
@@ -31,8 +31,7 @@ def do_mask_mp(arglist):
   
   end_time = time.time()
   duration = round(end_time - begin_time)
-  print(f"Finishing task: {thread_number} - {duration} seconds", flush = True)
-  print("len(masks)", masks)
+  print(f"Finishing task {thread_number} on {pid}:  diameter ${diameter}. {duration} seconds", flush = True)
   return masks
 
 def parse_input_directory(splitpath):
@@ -57,10 +56,15 @@ def main():
     path_dir = sys.argv[1]
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
-    path_dir = '/Users/david/work/MunskyColab/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+    path_dir = '/Users/david/work/MunskyColab/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_5'
 
+#path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data
+# ...   /201002_JM149_elt-2_Promoter_Rep_1 / L4440_RNAi / L1 / JM149_L1_L4440_worm_1
+#       /               -4                 /   -3       / -2 /         -1
+#       datestr genotype, X,    X,   X, repnum                     X _ X_  X  _ X  _ wormnumber
   datestr,RNAi,stage,genotype,repnum,wormnumber = parse_input_directory(path_dir.split(os.path.sep)[-4:])
 
+  
   print("import images", end='')
   os.chdir(path_dir)
   current_dir = pathlib.Path().absolute()
@@ -157,8 +161,7 @@ def main():
   ax[1].set(title='max_GFP'); ax[1].axis('on');ax[1].grid(False)
   plt.savefig('Brightfield_GFP.png')
   plt.close()
-  #plt.show()
-
+  
   #@title Plotting all z-slices
   print("Plotting all z-slices")
   number_z_slices = image_ZYXC.shape[0]
@@ -197,11 +200,10 @@ def main():
     with multiprocessing.Pool(processes = 4) as pool:
       arglist = [[model, max_Brightfield, diameter, 1, [0,0], True, True,i]  for i, diameter in enumerate(list_ranges)]
       mask_output = pool.map(do_mask_mp,arglist)
-    print("Adding masks together")
+    print("Adding masks together", end='')
     for masks in mask_output:
-      print("Masks:", len(masks))
       masks_total = masks_total + masks
-
+    print
     end_time = time.time()
     total_time += end_time - begin_time
 
