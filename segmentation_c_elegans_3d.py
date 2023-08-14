@@ -288,7 +288,7 @@ print("Calculating total intensities. Sum of intensity in all pixels inside of a
 plotname = f"{full_name_prefix}_total_intensity_hist"
 print("Plotting Total intensity values", plotname)
 fig, ax = plt.subplots(1,1, figsize=(5, 5))
-fig.suptitle(f"{full_name_prefix} histogram of total intensities inside cell mask")
+fig.suptitle(f"{full_name_prefix} histogram of\ntotal intensities inside cell mask")
 ax.hist(spots_detected_dataframe['mass'], bins=15, color = "orangered", ec="orangered")
 ax.set(xlabel='total intensity', ylabel='count')
 plt.savefig(plotname + '.png')
