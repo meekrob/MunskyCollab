@@ -34,6 +34,7 @@ except ValueError:
   raise
 
 wormnumber = shortname.split('_')[-1]
+full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
 
 os.chdir(path_dir)
 current_dir = pathlib.Path().absolute()
@@ -83,15 +84,6 @@ from cellpose import models
 from cellpose import plot
 print()
 
-# 
-# %matplotlib inline
-
-#@title Function to import data from dropbox (double-click to show code)
-
-
-
-
-
 """# Reading all images and converting them into form ZYXC."""
 
 # Separating images based on the color channel
@@ -129,26 +121,29 @@ print('Range in GFP: min', np.min(max_GFP), 'max',np.max(max_GFP))
 print('Range in Brightfield: min', np.min(max_Brightfield), 'max',np.max(max_Brightfield))
 
 #@title Plotting max projections
-print("Plotting max projections")
+plotname = f"{full_name_prefix}_max_projections"
+print("Plotting max projections:", plotname)
 color_map = 'Greys_r'
 fig, ax = plt.subplots(1,2, figsize=(10, 3))
-# Plotting the heatmap of a section in the image
-print("Plotting the heatmap of a section in the image")
+fig.suptitle(f"{full_name_prefix} max. projections")
+# Plotting the heatmap of a section in the image - MISPLACED LABEL? - DK
+# print("Plotting the heatmap of a section in the image")
 ax[0].imshow(max_Brightfield,cmap=color_map)
 ax[1].imshow(max_GFP,cmap=color_map)
 ax[0].set(title='max_Brightfield'); ax[0].axis('on');ax[0].grid(False)
 ax[1].set(title='max_GFP'); ax[1].axis('on');ax[1].grid(False)
-plt.savefig('Brightfield_GFP.png')
+plt.savefig(plotname + '.png')
 plt.close()
-#plt.show()
 
 #@title Plotting all z-slices
-print("Plotting all z-slices")
+plotname = f"{full_name_prefix}_z-slices"
+print(f"Plotting {plotname}")
 number_z_slices = image_ZYXC.shape[0]
 fig, ax = plt.subplots(2,number_z_slices, figsize=(25, 5))
+fig.suptitle(f"{full_name_prefix} z slices")
 color_map = 'Greys_r'
-# Plotting the heatmap of a section in the image
-print("Plotting the heatmap of a section in the image")
+# Plotting the heatmap of a section in the image - MISPLACED LABEL? -DK
+# print("Plotting the heatmap of a section in the image")
 for i in range (number_z_slices):
     # Channel 0
     temp_image_0= image_ZYXC[i,:,:,0]
@@ -160,8 +155,8 @@ for i in range (number_z_slices):
     max_visualization_value = np.percentile(temp_image_1,99)
     ax[1,i].imshow(temp_image_1,vmax=max_visualization_value,cmap=color_map)
     ax[1,i].axis('off');ax[1,i].grid(False); ax[1,i].axis('tight')
-plt.savefig('heatmap.png')
-#plt.show()
+plt.savefig(plotname + '.png')
+plt.close()
 
 #@title Using cellpose to segment image
 print("Using cellpose to segment image")
@@ -198,7 +193,7 @@ else:
      print("done")
 
 print("Total time: %d seconds" % round(total_time))
-#sys.exit(0)
+
 # Binarization
 print("Binarization")
 new_mask = masks_total.copy()
@@ -230,7 +225,9 @@ segmented_image = np.multiply(final_mask,max_Brightfield)
 cm = center_of_mass(segmented_image)
 
 # Plotting
+plotname = f"{full_name_prefix}_brightfield_w_mask"
 fig, ax = plt.subplots(1,3, figsize=(15, 5))
+fig.suptitle(f"{full_name_prefix} brightfield w/ mask")
 # Plotting the heatmap of a section in the image
 ax[0].imshow(max_Brightfield,cmap=color_map)
 ax[1].imshow(final_mask,cmap=color_map)
@@ -238,7 +235,7 @@ ax[2].imshow(segmented_image,cmap=color_map)
 ax[0].set(title='brightfield'); ax[0].axis('on');ax[0].grid(False)
 ax[1].set(title='Mask'); ax[1].axis('on');ax[1].grid(False)
 ax[2].set(title='brightfield * mask'); ax[2].axis('on');ax[0].grid(False)
-plt.savefig('mask.png')
+plt.savefig(plotname + '.png')
 plt.close()
 
 """# Nuclei segmentation using trackpy"""
@@ -251,36 +248,35 @@ import trackpy as tp # Library for particle tracking
 
 GFP = max_GFP.copy()
 
-# This section generates an histograme with the intensity of the detected particles in the image.
 particle_size = 21 # according to the documentation must be an odd number 3,5,7,9 etc.
+#fig, ax = plt.subplots(1,1, figsize=(4, 4))
 spots_detected_dataframe_all = tp.locate(GFP, diameter=particle_size, minmass=0)
 
+# This section generates an histogram with the intensity of the detected particles in the image.
 fig, ax = plt.subplots(1,1, figsize=(4, 4))
+plotname = f"{full_name_prefix}_histogram_mass"
+print(f"plotting {plotname}")
+fig.suptitle(f"{full_name_prefix}\nhistogram of intensities")
 ax.hist(spots_detected_dataframe_all['mass'], bins=50, color = "orangered", ec="orangered")
 ax.set(xlabel='mass', ylabel='count')
-plt.close(fig)
-plt.savefig('histogram.png')
+plt.savefig(plotname + '.png')
 plt.close()
 
-#plt.figure(figsize=(5,4))
+plotname = f"{full_name_prefix}_spots_detected"
+print("Plotting", plotname)
+plt.figure(figsize=(5,4))
+plt.suptitle(f"{full_name_prefix} spots detected")
 spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
-img = tp.annotate(spots_detected_dataframe, image=GFP, plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
-img.title.set_text(f"{datestr}_{genotype}_{RNAi}_{repnum}")
-img.figure.savefig(f"{datestr}_{genotype}_{RNAi}_{repnum}_annotated.png")      
-
+tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
+plt.savefig(plotname + '.png')
 plt.close()
-plt.savefig('spots_detected_dataframe.png')
-#plt.show()
+
+# save a file
 spots_detected_dataframe['Worm'] = wormnumber
 spots_detected_dataframe['Rep'] = repnum
 spots_detected_dataframe['RNAi'] = RNAi
 spots_detected_dataframe['Genotype'] = genotype
-
-rel_to_center = spots_detected_dataframe.loc[:,['x','y']]-cm
-spots_detected_dataframe['x_rel_to_center'] = rel_to_center.iloc[:,0]
-spots_detected_dataframe['y_rel_to_center'] = rel_to_center.iloc[:,1]
-spots_detected_dataframe['distance_from_center'] = (rel_to_center**2).sum(axis=1)**.5 # euclidean
-spots_detected_dataframe.to_csv(f"{datestr}_{genotype}_{RNAi}_{repnum}_dist_segmented.csv")
+spots_detected_dataframe.to_csv(f"{datestr}_{genotype}_{RNAi}_{repnum}_segmented_plot.csv")
 
 number_of_detected_cells = len(spots_detected_dataframe)
 number_of_detected_cells
@@ -289,19 +285,22 @@ number_of_detected_cells
 print("Calculating total intensities. Sum of intensity in all pixels inside of a cell mask.")
 
 # Total intensity values
-print("Total intensity values")
+plotname = f"{full_name_prefix}_total_intensity_hist"
+print("Plotting Total intensity values", plotname)
 fig, ax = plt.subplots(1,1, figsize=(5, 5))
+fig.suptitle(f"{full_name_prefix} histogram of total intensities inside cell mask")
 ax.hist(spots_detected_dataframe['mass'], bins=15, color = "orangered", ec="orangered")
 ax.set(xlabel='total intensity', ylabel='count')
+plt.savefig(plotname + '.png')
 plt.close()
-plt.savefig('total_intensity_v_count.png')
-#plt.show()
 
 # Nuclei size
-print("Nuclei size")
+plotname = f"{full_name_prefix}_nuclei_size_hist"
+print("Plotting Nuclei size", plotname)
 fig, ax = plt.subplots(1,1, figsize=(5, 5))
+fig.suptitle(f"{full_name_prefix} histogram of nuclei size")
 ax.hist(spots_detected_dataframe['size'], bins=15, color = "orangered", ec="orangered")
 ax.set(xlabel='nuclei size', ylabel='count')
+plt.savefig(plotname + '.png')
 plt.close()
-plt.savefig('nucleisize.png')
-#plt.show()
+
