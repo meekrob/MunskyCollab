@@ -172,9 +172,12 @@ pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{rep
 
 if os.path.exists( pickled_mask_path ):
    print("reading pickle...", end=" ")
+   begin_time = time.time()
    with open(pickled_mask_path, "rb") as inpickle:
     masks_total = pickle.load(inpickle)
+   end_time = time.time()
    print("done")
+   total_time += end_time - begin_time
 else:
   print("calculating mask")
   for i,diameter in enumerate (list_ranges):
