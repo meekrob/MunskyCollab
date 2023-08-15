@@ -76,7 +76,6 @@ list_images = [imread(str(f)) for f in path_files]
 # Reading the microscopy data
 number_images = len(path_files)
 print('Number of images in file: ', number_images)
-
 print('The images are stored in the following folder: ', path_dir)
 
 #print("\n".join(path_files))
@@ -244,7 +243,7 @@ fig.suptitle(plotname)
 ax.hist(spots_detected_dataframe_all['mass'], bins=50, color = "orangered", ec="orangered")
 ax.set(xlabel='mass', ylabel='count')
 plt.savefig(plotname + '.png')
-plt.show(block=False)
+plt.close()
 
 plotname = f"{full_name_prefix}_spots_detected"
 print("Plotting", plotname)
@@ -275,7 +274,7 @@ fig.suptitle(plotname)
 ax.hist(spots_detected_dataframe['mass'], bins=15, color = "orangered", ec="orangered")
 ax.set(xlabel='total intensity', ylabel='count')
 plt.savefig(plotname + '.png')
-plt.show(block=False)
+plt.close()
 
 # Nuclei size
 plotname = f"{full_name_prefix}_nuclei_size_hist"
@@ -285,5 +284,5 @@ fig.suptitle(plotname)
 ax.hist(spots_detected_dataframe['size'], bins=15, color = "orangered", ec="orangered")
 ax.set(xlabel='nuclei size', ylabel='count')
 plt.savefig(plotname + '.png')
-plt.show(block=False)
+plt.close()
 
