@@ -20,7 +20,7 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r data file}
-segmentation = read.table('all_segmentation_results.csv', sep=',', header=T)
+segmentation = read.table('rotated_all_segmentation_results.csv', sep=',', header=T)
 ```
 
 ## Including Plots
@@ -32,7 +32,24 @@ segmentation %<>% filter(Worm != '7-8')
 segmentation %<>% mutate(Rep = as.factor(Rep), Worm = factor(Worm,levels=1:11), RNAi=factor(RNAi, levels=rev(sort(unique(segmentation$RNAi)))))
 ```
 
-```{r plot}
-ggplot(segmentation, aes(x=x, y=y, color=Genotype)) + geom_line() + geom_point() + facet_wrap(~RNAi + Worm)
+```{r plots}
+g1 = ggplot(segmentation %>% filter(Rep == 1), aes(x=x, y=y, color=Genotype)) + facet_wrap(~RNAi + Worm) + ggtitle("Segmentation results Rep 1") + geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1) + ylim(c(-1500,1500))
+
+g2 = ggplot(segmentation %>% filter(Rep == 2), aes(x=x, y=y, color=Genotype)) + facet_wrap(~RNAi + Worm) + ggtitle("Segmentation results Rep 2") + geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1) + ylim(c(-1500,1500))
+
+g3 = ggplot(segmentation %>% filter(Rep == 3), aes(x=x, y=y, color=Genotype)) + facet_wrap(~RNAi + Worm) + ggtitle("Segmentation results Rep 3") + geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1) + ylim(c(-1500,1500))
+ 
+gL4440_RNAi = ggplot(segmentation %>% filter(RNAi == "L4440_RNAi"), aes(x=x_rot, y=y_rot, color=Rep)) + facet_wrap(~ Worm + Genotype) + ggtitle("Segmentation results L4440_RNAi") + geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1) + ylim(c(-1500,1500))
+
+gELT2_RNAi = ggplot(segmentation %>% filter(RNAi == "ELT-2_RNAi"), aes(x=x_rot, y=y_rot, color=Rep)) + facet_wrap(~ Worm + Genotype) + ggtitle("Segmentation results ELT-2_RNAi") + geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1) + ylim(c(-1500,1500))
+
+# g2 = ggplot(segmentation%>% filter(Rep == 1), aes(x=x_rot, y=y_rot, color=Genotype))  + facet_wrap(~RNAi + Worm) + ggtitle("Rotated onto x-axis")+ geom_hline(yintercept=0) + geom_vline(xintercept = 0) + geom_line() + geom_point() + theme(aspect.ratio = 1)+ ylim(c(-1500,1500))
+```
+
+```{r plot graphs}
+pdf(file="segmentation_overall_view_rotated.pdf", height=20, width=15)
+gL4440_RNAi
+gELT2_RNAi
+dev.off()
 ```
 
