@@ -23,7 +23,7 @@ print(table(df$Genotype, df$Rep))
 cat("\nNumber of rows per Genotype/Rep/RNAi combination:\n")
 print(table(df$Genotype, df$Rep, df$RNAi))
 
-outputfile="all_segmentation_results.csv"
+outputfile="all_dist_segmentation_results.csv"
 write.table(df, outputfile, row.names=F, sep=",", quote=F)
 
 cat("\n\nWrote", outputfile, "\n")
