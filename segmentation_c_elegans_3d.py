@@ -274,6 +274,23 @@ tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5})  # tp.a
 plt.savefig(plotname + '.png')
 plt.close()
 
+
+plotname = f"{full_name_prefix}_comparison"
+print("Brightfield, GFP and segmentation together", plotname)
+color_map = 'Greys_r'
+fig, ax = plt.subplots(1,3, figsize=(10, 3))
+fig.suptitle(f"{full_name_prefix} comparison")
+# Plotting the heatmap of a section in the image - MISPLACED LABEL? - DK
+# print("Plotting the heatmap of a section in the image")
+ax[0].imshow(max_Brightfield,cmap=color_map)
+ax[1].imshow(max_GFP,cmap=color_map)
+tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[2]) 
+ax[0].set(title='max_Brightfield'); ax[0].axis('on');ax[0].grid(False)
+ax[1].set(title='max_GFP'); ax[1].axis('on');ax[1].grid(False)
+ax[2].set(title='Spots detected')
+plt.savefig(plotname + '.png')
+plt.close()
+
 # save a file
 spots_detected_dataframe['Worm'] = wormnumber
 spots_detected_dataframe['Rep'] = repnum
