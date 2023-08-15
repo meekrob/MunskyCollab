@@ -278,7 +278,7 @@ plt.close()
 plotname = f"{full_name_prefix}_comparison"
 print("Brightfield, GFP and segmentation together", plotname)
 color_map = 'Greys_r'
-fig, ax = plt.subplots(1,3, figsize=(10, 3))
+fig, ax = plt.subplots(1,3, figsize=(20, 6), dpi=300)
 fig.suptitle(f"{full_name_prefix} comparison")
 # Plotting the heatmap of a section in the image - MISPLACED LABEL? - DK
 # print("Plotting the heatmap of a section in the image")
