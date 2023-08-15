@@ -10,12 +10,14 @@ DIRS=$(find $MNTPNT/*/*/L1 -name '*_worm_*' -type d)
 for f in $DIRS
 do
 
-    ls $f/*segmented.csv > /dev/null 2> /dev/null #&& echo 'got data' || echo 'no data yet'
-    if [ $? -eq 1 ]
-    then
-        time ~/work/MunskyColab/segmentation_c_elegans_3d.py $f
-    else
-        echo $f/*segmented.csv
+    ls $f/*dist_segmented.csv > /dev/null 2> /dev/null #&& echo 'got data' || echo 'no data yet'
+    #if [ $? -eq 1 ] # no files ending in "dist_segmented.csv"
+    if true
+    then # run segmentation
+        time ~/work/MunskyColab/segmentation_c_elegans_3d.py $f # writes {datestr}_{genotype}_{RNAi}_{repnum}_segmented.csv
+                                                                # Note that datestr comes from the directory name, not current date
+    else # echo the file(s) which end in "segmented.csv"
+        echo $f/*dist_segmented.csv 
     fi
 done
 
