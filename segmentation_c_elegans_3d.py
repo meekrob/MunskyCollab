@@ -278,13 +278,25 @@ plt.close()
 plotname = f"{full_name_prefix}_comparison"
 print("GFP and segmentation together", plotname)
 color_map = 'Greys_r'
-fig, ax = plt.subplots(1,2, figsize=(12, 6), dpi=300)
-fig.suptitle(f"{full_name_prefix} comparison")
 
-ax[0].imshow(max_GFP,cmap=color_map)
-tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[1]) 
-ax[0].set(title='max_GFP'); ax[0].axis('on');ax[0].grid(False)
-ax[1].set(title='Spots detected')
+
+# try multiple parameters
+minmasses = range(300,550,50)
+particle_sizes = [15,17,19,21,23]
+
+fig, ax = plt.subplots(len(minmasses),len(particle_sizes)+1, figsize=(12, 6), dpi=300)
+fig.suptitle(f"{full_name_prefix} parameter comparison")
+
+# GFP image will be in upper left
+ax[0,0].imshow(max_GFP,cmap=color_map)
+ax[0,0].set(title='max_GFP'); ax[0].axis('on');ax[0].grid(False)
+
+for i, particle_size in enumerate(particle_sizes):
+   for j, mm in enumerate(minmasses):
+    spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) 
+    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[1]) 
+    ax[i,j+1].set(title=f'Spots detected {particle_size};{mm}')
+
 plt.savefig(plotname + '.png')
 plt.close()
 
