@@ -289,7 +289,9 @@ fig.suptitle(f"{full_name_prefix} parameter comparison")
 
 # GFP image will be in upper left
 ax[0,0].imshow(max_GFP,cmap=color_map)
-ax[0,0].set(title='max_GFP'); ax[0].axis('on');ax[0].grid(False)
+ax[0,0].set(title='max_GFP')
+ax[0,0].axis('on')
+ax[0,0].grid(False)
 
 for i, particle_size in enumerate(particle_sizes):
    for j, mm in enumerate(minmasses):
