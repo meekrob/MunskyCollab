@@ -284,7 +284,10 @@ color_map = 'Greys_r'
 minmasses = range(300,550,50)
 particle_sizes = [15,17,19,21,23]
 
-fig, ax = plt.subplots(len(minmasses),len(particle_sizes)+1, figsize=(12, 6), dpi=300)
+fig, ax = plt.subplots(len(minmasses),len(particle_sizes)+1, 
+                       figsize=(6*len(minmasses), 
+                                6*len(particle_sizes)), 
+                                dpi=300)
 fig.suptitle(f"{full_name_prefix} parameter comparison")
 
 # GFP image will be in upper left
@@ -293,9 +296,14 @@ ax[0,0].set(title='max_GFP')
 ax[0,0].axis('on')
 ax[0,0].grid(False)
 
+# these are blank slots
+for i in range(1, len(particle_sizes)):
+   ax[i,0].axis('off')
+   ax[i,0].grid(False)
+
 for i, particle_size in enumerate(particle_sizes):
    for j, mm in enumerate(minmasses):
-    spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) 
+    spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
     tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[i,j+1]) 
     ax[i,j+1].set(title=f'Spots detected {particle_size};{mm}')
 
