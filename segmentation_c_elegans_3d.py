@@ -305,7 +305,7 @@ for i, mm in enumerate(minmasses):
   for j, particle_size in enumerate(particle_sizes):
     print(f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
-    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[i,j+1]) 
+    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5, 'linewidth':.5},ax=ax[i,j+1]) 
     ax[i,j+1].set(title=f'{particle_size};{mm}')
 
 plt.savefig(plotname + '.png')
