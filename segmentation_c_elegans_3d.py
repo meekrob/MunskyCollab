@@ -249,8 +249,8 @@ print("Nuclei segmentation using trackpy")
 # ! pip install trackpy
 import trackpy as tp # Library for particle tracking
 
-GFP = max_GFP.copy()
-
+# GFP = max_GFP.copy()
+GFP = np.multiply(final_mask,max_GFP)
 particle_size = 21 # according to the documentation must be an odd number 3,5,7,9 etc.
 #fig, ax = plt.subplots(1,1, figsize=(4, 4))
 spots_detected_dataframe_all = tp.locate(GFP, diameter=particle_size, minmass=0)
