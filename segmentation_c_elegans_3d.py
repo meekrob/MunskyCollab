@@ -281,8 +281,8 @@ color_map = 'Greys_r'
 
 
 # try multiple parameters
-minmasses = range(300,550,50)
-particle_sizes = [15,17,19,21,23]
+minmasses = range(200,450,50)
+particle_sizes = [15,17,19,21]
 
 fig, ax = plt.subplots(len(minmasses),len(particle_sizes)+1, 
                        figsize=(6*len(minmasses), 
@@ -301,8 +301,9 @@ for i in range(1, len(particle_sizes)):
    ax[i,0].axis('off')
    ax[i,0].grid(False)
 
-for i, particle_size in enumerate(particle_sizes):
-   for j, mm in enumerate(minmasses):
+for i, mm in enumerate(minmasses):
+  for j, particle_size in enumerate(particle_sizes):
+    print(f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
     tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5},ax=ax[i,j+1]) 
     ax[i,j+1].set(title=f'{particle_size};{mm}')
