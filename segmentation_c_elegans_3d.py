@@ -249,8 +249,9 @@ print("Nuclei segmentation using trackpy")
 # ! pip install trackpy
 import trackpy as tp # Library for particle tracking
 
-# GFP = max_GFP.copy()
-GFP = np.multiply(final_mask,max_GFP)
+GFP = max_GFP.copy()
+#GFP = np.multiply(final_mask,max_GFP)
+
 particle_size = 21 # according to the documentation must be an odd number 3,5,7,9 etc.
 #fig, ax = plt.subplots(1,1, figsize=(4, 4))
 spots_detected_dataframe_all = tp.locate(GFP, diameter=particle_size, minmass=0)
@@ -297,7 +298,7 @@ ax[0,0].axis('on')
 ax[0,0].grid(False)
 
 # these are blank slots
-for i in range(1, len(particle_sizes)):
+for i in range(1, len(minmasses)):
    ax[i,0].axis('off')
    ax[i,0].grid(False)
 
@@ -305,7 +306,10 @@ for i, mm in enumerate(minmasses):
   for j, particle_size in enumerate(particle_sizes):
     print(f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
-    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5, 'markeredgewidth':.5},ax=ax[i,j+1]) 
+    size = spots_detected_dataframe.loc['size']
+    total = size.sum()
+    markersizes = ( size / total ) * 2
+    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': markersizes, 'markeredgewidth':.5},ax=ax[i,j+1]) 
     ax[i,j+1].set(title=f'{particle_size};{mm}')
 
 plt.savefig(plotname + '.png')
