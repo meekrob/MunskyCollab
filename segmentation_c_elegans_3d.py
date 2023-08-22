@@ -19,7 +19,8 @@ print("reading directory")
 if len(sys.argv) > 1:
   path_dir = sys.argv[1]
 else:
-   path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+   #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+   path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
 
 
 # figure out provenance/ID from path info
@@ -224,9 +225,24 @@ for prop in props:
 # Mask by image
 segmented_image = np.multiply(final_mask,max_Brightfield)
 
+
+x, y = segmented_image.nonzero()
+
+# horizontal line through worm
+A = np.vstack([x, np.ones(len(x))]).T
+horiz_fit = np.linalg.lstsq(A, y, rcond=None)
+m, c = horiz_fit[0]
+print(f"Horizontal: slope {m}, intercept {round(c)}")
+
+# vertical line through worm
+A = np.vstack([y, np.ones(len(y))]).T
+vertical_fit = np.linalg.lstsq(A, x, rcond=None)
+m, c = vertical_fit[0]
+print(f"Vertical: slope {m}, intercept {round(c)}")
+
 # Find center of mass
 cm = center_of_mass(segmented_image)
-
+#sys.exit(0)
 # Plotting
 plotname = f"{full_name_prefix}_brightfield_w_mask"
 fig, ax = plt.subplots(1,3, figsize=(15, 5))
@@ -268,10 +284,11 @@ plt.close()
 
 plotname = f"{full_name_prefix}_spots_detected"
 print("Plotting", plotname)
-plt.figure(figsize=(5,4))
-plt.suptitle(f"{full_name_prefix} spots detected")
+
+fig, ax = plt.subplots(1,1, figsize=(5, 4))
+fig.suptitle(f"{full_name_prefix} spots detected")
 spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
-tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5})  # tp.anotate is a trackpy function that displays the image with the detected spots
+tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5}, ax=ax)  # tp.anotate is a trackpy function that displays the image with the detected spots
 plt.savefig(plotname + '.png')
 plt.close()
 
@@ -306,11 +323,22 @@ for i, mm in enumerate(minmasses):
   for j, particle_size in enumerate(particle_sizes):
     print(f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
-    size = spots_detected_dataframe.loc['size']
-    total = size.sum()
-    markersizes = ( size / total ) * 2
-    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': markersizes, 'markeredgewidth':.5},ax=ax[i,j+1]) 
+
+    x = list(spots_detected_dataframe.loc[:,'x'])
+    y = list(spots_detected_dataframe.loc[:,'y'])
+    markersizes = list(spots_detected_dataframe.loc[:,'size'] * 1.5) 
+#    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': markersizes, 'markeredgewidth':.5},ax=ax[i,j+1])
+    _imshow_style = dict(origin='lower', interpolation='nearest',
+                         cmap=plt.cm.gray)
+    ax[i,j+1].imshow(GFP, **_imshow_style)
+    ax[i,j+1].set_xlim(-0.5, GFP.shape[1] - 0.5)
+    ax[i,j+1].set_ylim(-0.5, GFP.shape[0] - 0.5)
+    ax[i,j+1].scatter(x, y, s=markersizes, edgecolors="r", linewidths=2, alpha=.5)
+    bottom, top = ax[i,j+1].get_ylim()
+    if top > bottom:
+      ax[i,j+1].set_ylim(top, bottom, auto=None)
     ax[i,j+1].set(title=f'{particle_size};{mm}')
+
 
 plt.savefig(plotname + '.png')
 plt.close()
