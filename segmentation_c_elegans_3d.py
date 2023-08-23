@@ -314,19 +314,24 @@ fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1,
                                 dpi=300)
 fig.suptitle(f"{full_name_prefix} parameter comparison")
 
-# GFP image will be in upper left
+
+# Left column is a replot of previous steps, subsequent columns are 
+# spot finding at different params
 ax[0,0].imshow(max_Brightfield,cmap=color_map)
 ax[1,0].imshow(final_mask,cmap=color_map)
 ax[2,0].imshow(segmented_image,cmap=color_map)
 ax[3,0].imshow(max_GFP,cmap=color_map)
+# ax[4,0] will be a plot of the selected params
 
-ax[0,0].set(title='brightfield'); ax[0,0].axis('on');ax[0,0].grid(False)
-ax[1,0].set(title='Mask'); ax[1,0].axis('on');ax[1,0].grid(False)
-ax[2,0].set(title='brightfield * mask'); ax[2,0].axis('on');ax[2,0].grid(False)
-ax[3,0].set(title='max GFP'); ax[3,0].axis('on');ax[3,0].grid(False)
+ax[0,0].set(title='brightfield')
+ax[1,0].set(title='Mask')
+ax[2,0].set(title='brightfield * mask')
+ax[3,0].set(title='max GFP')
+# ax[4,0] will be a plot of the selected params
 
-# these are blank slots in the plot
-for i in range(1, len(minmass_vector)):
+# keep the remaining blank slots in the first column 
+# from showing empty axes by turning them off
+for i in range(5, len(minmass_vector)):
    ax[i,0].axis('off')
    ax[i,0].grid(False)
 
@@ -360,6 +365,7 @@ for i, mm in enumerate(minmass_vector):
 
     del spots_detected_dataframe, df_in_mask
 
+# don't plot yet, find the optimized one and add it in the left column
 # plt.savefig(plotname + '.png')
 # plt.close()
 
