@@ -14,12 +14,24 @@ import re
 import glob
 from skimage.io import imread        # Module from skimage to read images as numpy arrays
 
+# from Luis
+def spots_in_mask(df,masks):
+    # extracting the contours in the image
+    coords = np.array([df.y, df.x]).T # These are the points detected by trackpy
+    coords_int = np.round(coords).astype(int)  # or np.floor, depends
+    values_at_coords = masks[tuple(coords_int.T)] # If 1 the value is in the mask
+    df['In Mask']=values_at_coords # Check if pts are on/in polygon mask
+    condition = df['In Mask'] ==1
+    selected_rows = df[condition]
+    return selected_rows
+
 print("reading directory")
 
 if len(sys.argv) > 1:
   path_dir = sys.argv[1]
 else:
    #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+   #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
 
 
@@ -282,52 +294,59 @@ ax.set(xlabel='mass', ylabel='count')
 plt.savefig(plotname + '.png')
 plt.close()
 
-plotname = f"{full_name_prefix}_spots_detected"
-print("Plotting", plotname)
-
-fig, ax = plt.subplots(1,1, figsize=(5, 4))
-fig.suptitle(f"{full_name_prefix} spots detected")
-spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=400) # "spots_detected_dataframe" is a pandas data freame that contains the infomation about the detected spots
-tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': 1.5}, ax=ax)  # tp.anotate is a trackpy function that displays the image with the detected spots
-plt.savefig(plotname + '.png')
-plt.close()
 
 # Plot GFP and the tp.annotate graph together
 plotname = f"{full_name_prefix}_comparison"
 print("GFP and segmentation together", plotname)
 color_map = 'Greys_r'
 
+# Optimization from Luis!
+# Creating vectors to test all conditions for nuclei detection.
+number_optimization_steps = 10
+particle_size_vector = [num for num in range(13, 25 + 1) if num % 2 != 0][:number_optimization_steps]
+print('particle_size_vector: ', particle_size_vector)
+minmass_vector = np.linspace(250, 500, num=number_optimization_steps, endpoint=True,dtype=int)
+print('minmass_vector: ', minmass_vector)
 
-# try multiple parameters
-minmasses = range(200,450,50)
-particle_sizes = [15,17,19,21]
-
-fig, ax = plt.subplots(len(minmasses),len(particle_sizes)+1, 
-                       figsize=(6*len(minmasses), 
-                                6*len(particle_sizes)), 
+fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1, 
+                       figsize=(6*len(minmass_vector), 
+                                6*len(particle_size_vector)), 
                                 dpi=300)
 fig.suptitle(f"{full_name_prefix} parameter comparison")
 
 # GFP image will be in upper left
-ax[0,0].imshow(max_GFP,cmap=color_map)
-ax[0,0].set(title='max_GFP')
-ax[0,0].axis('on')
-ax[0,0].grid(False)
+ax[0,0].imshow(max_Brightfield,cmap=color_map)
+ax[1,0].imshow(final_mask,cmap=color_map)
+ax[2,0].imshow(segmented_image,cmap=color_map)
+ax[3,0].imshow(max_GFP,cmap=color_map)
 
-# these are blank slots
-for i in range(1, len(minmasses)):
+ax[0,0].set(title='brightfield'); ax[0,0].axis('on');ax[0,0].grid(False)
+ax[1,0].set(title='Mask'); ax[1,0].axis('on');ax[1,0].grid(False)
+ax[2,0].set(title='brightfield * mask'); ax[2,0].axis('on');ax[2,0].grid(False)
+ax[3,0].set(title='max GFP'); ax[3,0].axis('on');ax[3,0].grid(False)
+
+# these are blank slots in the plot
+for i in range(1, len(minmass_vector)):
    ax[i,0].axis('off')
    ax[i,0].grid(False)
 
-for i, mm in enumerate(minmasses):
-  for j, particle_size in enumerate(particle_sizes):
+# optimization from Luis!
+metric = np.zeros((number_optimization_steps,number_optimization_steps))
+
+for i, mm in enumerate(minmass_vector):
+  for j, particle_size in enumerate(particle_size_vector):
     print(f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
+    # Selecting only spots located inside mask
+    df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
+    metric[i,j] = np.sum(df_in_mask['mass']) / len(df_in_mask) # maximizes the mean intensity in all spots
 
-    x = list(spots_detected_dataframe.loc[:,'x'])
-    y = list(spots_detected_dataframe.loc[:,'y'])
-    markersizes = list(spots_detected_dataframe.loc[:,'size'] * 1.5) 
-#    tp.annotate(spots_detected_dataframe,GFP,plot_style={'markersize': markersizes, 'markeredgewidth':.5},ax=ax[i,j+1])
+    # add plot with different parameters to grid    
+    x = list(df_in_mask.loc[:,'x'])
+    y = list(df_in_mask.loc[:,'y'])
+    markersizes = list(df_in_mask.loc[:,'size'] * 1.5) 
+
+    # basically transferred this from trackpy.annotate, allowing for more control
     _imshow_style = dict(origin='lower', interpolation='nearest',
                          cmap=plt.cm.gray)
     ax[i,j+1].imshow(GFP, **_imshow_style)
@@ -339,11 +358,57 @@ for i, mm in enumerate(minmasses):
       ax[i,j+1].set_ylim(top, bottom, auto=None)
     ax[i,j+1].set(title=f'{particle_size};{mm}')
 
+    del spots_detected_dataframe, df_in_mask
 
+# plt.savefig(plotname + '.png')
+# plt.close()
+
+
+metric = metric.astype(int)
+print(metric)
+# selecting indces that maximize metric
+selected_minmass_index, selected_particle_size_index = np.unravel_index(metric.argmax(), metric.shape)
+selected_minmass = minmass_vector[selected_minmass_index]
+selected_particle_size = particle_size_vector[selected_particle_size_index]
+print(selected_minmass)
+print(selected_particle_size)
+
+spots_detected_dataframe = tp.locate(GFP,diameter=selected_particle_size, minmass=selected_minmass) 
+df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
+# plot the "best" one underneath the brightfield/mask/GFP
+ax[4,0].set(title=f'Selected params: {selected_particle_size}, {selected_minmass}')
+# add plot with different parameters to grid    
+x = list(df_in_mask.loc[:,'x'])
+y = list(df_in_mask.loc[:,'y'])
+markersizes = list(df_in_mask.loc[:,'size'] * 1.5) 
+
+# basically transferred this from trackpy.annotate, allowing for more control
+_imshow_style = dict(origin='lower', interpolation='nearest',
+                      cmap=plt.cm.gray)
+ax[4,0].imshow(GFP, **_imshow_style)
+ax[4,0].set_xlim(-0.5, GFP.shape[1] - 0.5)
+ax[4,0].set_ylim(-0.5, GFP.shape[0] - 0.5)
+ax[4,0].scatter(x, y, s=markersizes, edgecolors="r", linewidths=2, alpha=.5)
+bottom, top = ax[4,0].get_ylim()
+if top > bottom:
+  ax[4,0].set_ylim(top, bottom, auto=None)
+
+# write the comparison figure
+plt.savefig(plotname + '.png')
+plt.close()
+
+# write the selected spot find
+plotname = f"{full_name_prefix}_spots_detected"
+print("Plotting", plotname)
+
+fig, ax = plt.subplots(1,1, figsize=(5, 4))
+fig.suptitle(f"{full_name_prefix} spots detected")
+tp.annotate(df_in_mask,GFP,plot_style={'markersize': 1.5}, ax=ax) 
 plt.savefig(plotname + '.png')
 plt.close()
 
 # save a file
+spots_detected_dataframe = df_in_mask
 spots_detected_dataframe['Worm'] = wormnumber
 spots_detected_dataframe['Rep'] = repnum
 spots_detected_dataframe['RNAi'] = RNAi
