@@ -32,7 +32,7 @@ if len(sys.argv) > 1:
 else:
    #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
    #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
-   path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
+   path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_3'
 
 
 # figure out provenance/ID from path info
@@ -77,10 +77,24 @@ import skimage                       # Library for image manipulation
 import numpy as np                   # Library for array manipulation
 import matplotlib.pyplot as plt      # Library used for plotting
 
-from skimage.filters import gaussian # Module working with a gaussian filter
+def annotate_spots(df, GFP, ax):
+  x = list(df.loc[:,'x'])
+  y = list(df.loc[:,'y'])
+  markersizes = list(df.loc[:,'size'] * 1.5)
+  # basically transferred this from trackpy.annotate, allowing for more control
+  _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
+  ax.imshow(GFP, **_imshow_style)
+  ax.set_xlim(-0.5, GFP.shape[1] - 0.5)
+  ax.set_ylim(-0.5, GFP.shape[0] - 0.5)
+  ax.scatter(x, y, s=markersizes, edgecolors="r", linewidths=2, alpha=.5)
+  bottom, top = ax.get_ylim()
+  if top > bottom:
+    ax.set_ylim(top, bottom, auto=None)
+  
+  return ax
 
+from skimage.filters import gaussian # Module working with a gaussian filter
 from skimage.measure import label, regionprops
-# 
 from skimage.morphology import square, dilation
 from skimage import measure
 from scipy.ndimage import gaussian_filter, center_of_mass
@@ -236,25 +250,74 @@ for prop in props:
         final_mask[coords[:, 0], coords[:, 1]] = 1
 # Mask by image
 segmented_image = np.multiply(final_mask,max_Brightfield)
+plot_center = np.array(segmented_image.shape)[:2]/2
+from skimage import transform
+shift_to_plot_center = transform.EuclideanTransform(translation=-plot_center)
+#cm = center_of_mass(segmented_image)
+cm = np.array(segmented_image.shape)[:2]/2
 
+# translation to rotate around cm
+
+shift = transform.EuclideanTransform(translation=-np.array(cm))
 
 x, y = segmented_image.nonzero()
 
 # horizontal line through worm
 A = np.vstack([x, np.ones(len(x))]).T
 horiz_fit = np.linalg.lstsq(A, y, rcond=None)
-m, c = horiz_fit[0]
-print(f"Horizontal: slope {m}, intercept {round(c)}")
+horiz_slope, horiz_intercept = horiz_fit[0]
+print(f"Horizontal: {horiz_slope=}, intercept {round(horiz_intercept)}, SS Resid {horiz_fit[1]}")
 
 # vertical line through worm
 A = np.vstack([y, np.ones(len(y))]).T
 vertical_fit = np.linalg.lstsq(A, x, rcond=None)
-m, c = vertical_fit[0]
-print(f"Vertical: slope {m}, intercept {round(c)}")
+vertical_slope, vertical_intercept = vertical_fit[0]
+print(f"Vertical: {vertical_slope=}, intercept {round(vertical_intercept)}, SS Resid {vertical_fit[1]}")
 
-# Find center of mass
-cm = center_of_mass(segmented_image)
-#sys.exit(0)
+plotname = f"{full_name_prefix}_rotation_check"
+fig, ax  = plt.subplots(2,2, figsize=(10,10))
+fig.suptitle(f"{full_name_prefix} rotation")
+ax[0,0].imshow(segmented_image,cmap=color_map)
+xx = np.linspace(x.min(),x.max(),3)
+yy = horiz_slope*xx + horiz_intercept
+# center of line (horizontal)
+cm_horiz = (xx[1],yy[1])
+cm_horiz_shift = transform.EuclideanTransform(translation=-np.array(cm_horiz))
+
+ax[0,0].scatter(cm_horiz[1], cm_horiz[0],  s=10, edgecolors='b')
+ax[0,0].plot(yy,xx, 'r')
+ax[0,0].set(title='horizontal line fit')
+
+ax[0,1].imshow(segmented_image,cmap=color_map)
+ax[0,1].set(title='vertical line fit')
+xx = np.linspace(y.min(),y.max(),3)
+yy =  vertical_slope*xx + vertical_intercept
+# center of line (vertical)
+cm_vertical = (xx[1],yy[1])
+cm_vertical_shift = transform.EuclideanTransform(translation=-np.array(cm_vertical))
+
+ax[0,1].scatter(cm_vertical[0], cm_vertical[1], s=10, edgecolors='b')
+ax[0,1].plot(xx,yy,'r')
+
+import math
+angle = math.atan(horiz_slope) + math.pi/2
+rotation = transform.EuclideanTransform(rotation=angle)
+matrix = np.linalg.inv(cm_horiz_shift.params) @ rotation.params @ shift_to_plot_center.params
+tform = transform.EuclideanTransform(matrix)
+tf_img = transform.warp(segmented_image, tform.inverse)
+ax[1,0].imshow(tf_img, cmap=color_map)
+
+angle = math.atan(vertical_slope)
+rotation = transform.EuclideanTransform(rotation=-angle)
+matrix = np.linalg.inv(cm_vertical_shift.params) @ rotation.params @ shift_to_plot_center.params
+tform = transform.EuclideanTransform(matrix)
+tf_img = transform.warp(segmented_image, tform.inverse)
+ax[1,1].imshow(tf_img, cmap=color_map)
+
+
+plt.show()
+
+
 # Plotting
 plotname = f"{full_name_prefix}_brightfield_w_mask"
 fig, ax = plt.subplots(1,3, figsize=(15, 5))
@@ -344,24 +407,13 @@ for i, mm in enumerate(minmass_vector):
     spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
     # Selecting only spots located inside mask
     df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
-    metric[i,j] = np.sum(df_in_mask['mass']) / len(df_in_mask) # maximizes the mean intensity in all spots
+    if len(df_in_mask) > 0:
+      metric[i,j] = np.sum(df_in_mask['mass']) / len(df_in_mask) # maximizes the mean intensity in all spots
+    else:
+      metric[i,j] = 0
 
-    # add plot with different parameters to grid    
-    x = list(df_in_mask.loc[:,'x'])
-    y = list(df_in_mask.loc[:,'y'])
-    markersizes = list(df_in_mask.loc[:,'size'] * 1.5) 
-
-    # basically transferred this from trackpy.annotate, allowing for more control
-    _imshow_style = dict(origin='lower', interpolation='nearest',
-                         cmap=plt.cm.gray)
-    ax[i,j+1].imshow(GFP, **_imshow_style)
-    ax[i,j+1].set_xlim(-0.5, GFP.shape[1] - 0.5)
-    ax[i,j+1].set_ylim(-0.5, GFP.shape[0] - 0.5)
-    ax[i,j+1].scatter(x, y, s=markersizes, edgecolors="r", linewidths=2, alpha=.5)
-    bottom, top = ax[i,j+1].get_ylim()
-    if top > bottom:
-      ax[i,j+1].set_ylim(top, bottom, auto=None)
-    ax[i,j+1].set(title=f'{particle_size};{mm}')
+    annotate_spots(df_in_mask, GFP, ax[i,j+1])
+    ax[i,j+1].set(title=f'{particle_size};{mm}; {len(df_in_mask)} spots')
 
     del spots_detected_dataframe, df_in_mask
 
@@ -382,23 +434,9 @@ print(selected_particle_size)
 spots_detected_dataframe = tp.locate(GFP,diameter=selected_particle_size, minmass=selected_minmass) 
 df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
 # plot the "best" one underneath the brightfield/mask/GFP
-ax[4,0].set(title=f'Selected params: {selected_particle_size}, {selected_minmass}')
+ax[4,0].set(title=f'Selected params: {selected_particle_size}, {selected_minmass}. {len(df_in_mask)} spots')
 # add plot with different parameters to grid    
-x = list(df_in_mask.loc[:,'x'])
-y = list(df_in_mask.loc[:,'y'])
-markersizes = list(df_in_mask.loc[:,'size'] * 1.5) 
-
-# basically transferred this from trackpy.annotate, allowing for more control
-_imshow_style = dict(origin='lower', interpolation='nearest',
-                      cmap=plt.cm.gray)
-ax[4,0].imshow(GFP, **_imshow_style)
-ax[4,0].set_xlim(-0.5, GFP.shape[1] - 0.5)
-ax[4,0].set_ylim(-0.5, GFP.shape[0] - 0.5)
-ax[4,0].scatter(x, y, s=markersizes, edgecolors="r", linewidths=2, alpha=.5)
-bottom, top = ax[4,0].get_ylim()
-if top > bottom:
-  ax[4,0].set_ylim(top, bottom, auto=None)
-
+annotate_spots(df_in_mask, GFP, ax[4,0])
 # write the comparison figure
 plt.savefig(plotname + '.png')
 plt.close()
@@ -407,9 +445,15 @@ plt.close()
 plotname = f"{full_name_prefix}_spots_detected"
 print("Plotting", plotname)
 
-fig, ax = plt.subplots(1,1, figsize=(5, 4))
+fig, ax = plt.subplots(1,3, figsize=(15, 5),dpi=1000)
 fig.suptitle(f"{full_name_prefix} spots detected")
-tp.annotate(df_in_mask,GFP,plot_style={'markersize': 1.5}, ax=ax) 
+ax[0].imshow(max_Brightfield,cmap=color_map)
+ax[1].imshow(max_GFP,cmap=color_map)
+ax[0].set(title='Brightfield'); ax[0].axis('off');ax[0].grid(False)
+ax[1].set(title='GFP'); ax[1].axis('off');ax[1].grid(False)
+ax[2].set(title='spots detected'); ax[2].axis('off');ax[2].grid(False)
+tp.annotate(df_in_mask,GFP,plot_style={'markersize': 1.5}, ax=ax[2]) 
+#annotate_spots(df_in_mask, GFP, ax[2])
 plt.savefig(plotname + '.png')
 plt.close()
 
