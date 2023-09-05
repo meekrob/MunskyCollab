@@ -36,35 +36,8 @@ import pickle
 from cellpose import models
 from cellpose import plot
 
-def make_pickle_filename(key):
-   genotype, rep, stage, RNAi, worm = key
-   return f"{genotype}_{rep}_{stage}_{RNAi}_{worm}.pick"
+from utils import *
 
-def make_key(genotype, rep, stage, RNAi, worm):
-   return genotype, rep, stage, RNAi, worm
-
-def init_data(genotype, rep, stage, RNAi, worm):
-   k = make_key(genotype, rep, stage, RNAi, worm)
-   data = {} 
-   data[k] = {}
-   # add objects to "data[k]", but call save_data(data). This will allow the key to be included in the dict.
-   return k, data[k], data 
-
-def save_data(data):
-   key = list(data.keys())[0]
-   pickname = make_pickle_filename(key)
-   with open(pickname,"wb") as outpickle:
-     print("writing", pickname, "...", end="")
-     pickle.dump(data, outpickle)
-     print("done")
-
-def load_data(filename):
-   print("reading pickle...", end=" ")
-   with open(filename, "rb") as inpickle:
-    data = pickle.load(inpickle)
-    print("done")
-   key = list(data.keys())[0]
-   return key, data[key]
 # helper functions to handle coordinates
 
 def in_range(x, low, high):
@@ -146,6 +119,16 @@ def annotate_spots(df, GFP, ax, plot_styles = {}):
 
   return ax
 
+def rotate_df(df, final_matrix):
+    df_mx = df.loc[:,('x','y')]
+    df_mx['1'] = 1
+    rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
+    rotated_df = df.copy()
+    rotated_df['orig_x'] = df['x']
+    rotated_df['orig_y'] = df['y']
+    rotated_df['x'] = rotated.iloc[:,0]
+    rotated_df['y'] = rotated.iloc[:,1]
+    return rotated_df
 
 # from Luis
 def spots_in_mask(df,masks):
@@ -164,6 +147,7 @@ def transform_and_crop(image, tform):
   x,y = tformed.nonzero()
   return tformed[:max(x),:max(y)]
 
+
 def main():
   print("reading directory")
 
@@ -174,10 +158,10 @@ def main():
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
     path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_3'
 
-
-  # figure out provenance/ID from path info
-  #i.e.: path_dir = 32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1
-
+  os.chdir(path_dir)
+  current_dir = pathlib.Path().absolute()
+  
+  # get worm info from path and filename
   try:
     longname,RNAi,stage,shortname = path_dir.split(os.path.sep)[-4:]
     # i.e.  201124_JM259_elt-2_Promoter_Rep_1, ELT-2_RNAi, L1, JM259_L1_ELT-2_worm_1
@@ -189,55 +173,10 @@ def main():
   wormnumber = shortname.split('_')[-1]
   full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
   k, datasave, data = init_data(genotype, repnum, stage, RNAi, wormnumber)
+  
 
 
-  os.chdir(path_dir)
-  current_dir = pathlib.Path().absolute()
-  #path_input = current_dir.joinpath(folder_name)
-  path_input = current_dir
-  # Reads the folder with the results and import the simulations as lists
-  list_files_names = sorted([f for f in listdir(path_input) if isfile(join(path_input, f)) and ('.tif') in f], key=str.lower)  # reading all tif files in the folder
-  list_files_names.sort(key=lambda f: int(re.sub('\D', '', f)))  # sorting the index in numerical order
-  path_files = [ str(path_input.joinpath(f).resolve()) for f in list_files_names ] # creating the complete path for each file
-
-  list_images = [imread(str(f)) for f in path_files]
-  # Reading the microscopy data
-  number_images = len(path_files)
-  print('Number of images in file: ', number_images)
-  print('The images are stored in the following folder: ', path_dir)
-
-  """# Reading all images and converting them into form ZYXC."""
-  # Separating images based on the color channel
-  print("Separating images based on the color channel")
-  selected_elements_Overlay = [element for element in path_files if 'Overlay.tif' in element]
-  selected_elements_CH2 = [element for element in path_files if 'CH2.tif' in element]
-  selected_elements_CH4 = [element for element in path_files if 'CH4.tif' in element]
-
-  # Reading all images in each list.
-  print("Reading all images in each list.")
-  list_images_CH2_full = [imread(str(f)) for f in selected_elements_CH2]  # [Y,X,3C]  Color channels 0 and 2 are empty. Use channel 1
-  list_images_CH2 = [img[:,:,1] for img in list_images_CH2_full] #
-  list_images_CH4 = [imread(str(f)) for f in selected_elements_CH4]  # [Y,X]   It appears to be to contain the same information as Overlay
-  list_images_Overlay = [imread(str(f)) for f in selected_elements_Overlay] # [Y,X,3C]  # It has 3 color channels but all appear to contain the same information
-
-  # Creating 3D arrays with all images in the list
-  print("Creating 3D arrays with all images in the list")
-  images_CH2_3d = np.stack(list_images_CH2)
-  images_C4_3d = np.stack(list_images_CH4)
-
-  # Creating a 4D array with shape ZYXC.  GFP
-  print("Creating a 4D array with shape ZYXC.  GFP")
-  array4d = np.concatenate((images_CH2_3d[np.newaxis, ...], images_C4_3d[np.newaxis, ...]), axis=0)
-  # Move the axis from position 0 to position 2
-  print("Move the axis from position 0 to position 2")
-  image_ZYXC = np.moveaxis(array4d, 0, 3)
-  print('Final image shape: ', image_ZYXC.shape, '\nGFP is channel 0 \nBrightfield is channel 1')
-
-  # Plotting maximum projection
-  print("Plotting maximum projection")
-  max_GFP = np.max(image_ZYXC[:,:,:,0],axis=0)
-  max_Brightfield = np.max(image_ZYXC[:,:,:,1],axis=0)
-
+  max_GFP, max_Brightfield, image_ZYXC = read_into_max_projections(path_dir)
   print('Range in GFP: min', np.min(max_GFP), 'max',np.max(max_GFP))
   print('Range in Brightfield: min', np.min(max_Brightfield), 'max',np.max(max_Brightfield))
 
@@ -266,8 +205,6 @@ def main():
   fig, ax = plt.subplots(2,number_z_slices, figsize=(25, 5))
   fig.suptitle(f"{full_name_prefix} z slices")
   color_map = 'Greys_r'
-  # Plotting the heatmap of a section in the image - MISPLACED LABEL? -DK
-  # print("Plotting the heatmap of a section in the image")
   for i in range (number_z_slices):
       # Channel 0
       temp_image_0= image_ZYXC[i,:,:,0]
@@ -347,9 +284,11 @@ def main():
           final_mask[coords[:, 0], coords[:, 1]] = 1
   # Mask by image
   segmented_image = np.multiply(final_mask,max_Brightfield)
+  masked_GFP = np.multiply(final_mask,max_GFP)
   datasave['final_mask'] = final_mask
   datasave['segmented_image'] = segmented_image
-  
+  datasave['masked_GFP'] = masked_GFP
+
   plot_center = np.array(segmented_image.T.shape)[:2]/2
   print(segmented_image.shape)
   print(-plot_center)
@@ -549,7 +488,7 @@ def main():
   print("GFP and segmentation together", plotname)
   color_map = 'Greys_r'
 
-  SPOT_PARAMS = (472,25)
+  SPOT_PARAMS =  (388,19)
 
   if SPOT_PARAMS is None:
     # Optimization from Luis!
@@ -561,18 +500,18 @@ def main():
     print('minmass_vector: ', minmass_vector)
 
     fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1, 
-                          figsize=(6*len(minmass_vector), 
-                                    6*len(particle_size_vector)), 
-                                    dpi=300)
+                          figsize=(3*len(particle_size_vector),
+                                   1*len(minmass_vector)), 
+                                    dpi=1000)
     fig.suptitle(f"{full_name_prefix} parameter comparison")
 
 
     # Left column is a replot of previous steps, subsequent columns are 
     # spot finding at different params
-    ax[0,0].imshow(max_Brightfield,cmap=color_map)
-    ax[1,0].imshow(final_mask,cmap=color_map)
-    ax[2,0].imshow(segmented_image,cmap=color_map)
-    ax[3,0].imshow(max_GFP,cmap=color_map)
+    ax[0,0].imshow(transform_and_crop(segmented_image,final_tform),cmap=color_map)
+    ax[1,0].imshow(transform_and_crop(final_mask,final_tform),cmap=color_map)
+    ax[2,0].imshow(transform_and_crop(segmented_image, final_tform),cmap=color_map)
+    ax[3,0].imshow(transform_and_crop(masked_GFP, final_tform),cmap=color_map)
     # ax[4,0] will be a plot of the selected params
 
     ax[0,0].set(title='brightfield')
@@ -601,7 +540,10 @@ def main():
         else:
           metric[i,j] = 0
 
-        annotate_spots(df_in_mask, GFP, ax[i,j+1])
+        annotate_spots(rotate_df(df_in_mask,final_tform), transform_and_crop(masked_GFP, final_tform), ax[i,j+1],
+                       plot_styles={'s': 6, 'alpha':1, 'linewidths':.6, 'facecolors': 'none', 'edgecolors': 'r' })
+        ax[i,j+1].axis('off')
+        ax[i,j+1].grid(False)
         ax[i,j+1].set(title=f'{particle_size};{mm}; {len(df_in_mask)} spots')
 
         del spots_detected_dataframe, df_in_mask
@@ -623,7 +565,7 @@ def main():
     # plot the "best" one underneath the brightfield/mask/GFP
     ax[4,0].set(title=f'Selected params: {selected_particle_size}, {selected_minmass}. {len(df_in_mask)} spots')
     # add plot with different parameters to grid    
-    annotate_spots(df_in_mask, GFP, ax[4,0])
+    annotate_spots(df_in_mask, transform_and_crop(masked_GFP, final_tform), ax[4,0])
     # write the comparison figure
     plt.savefig(plotname + '.png')
     plt.close()
@@ -648,24 +590,13 @@ def main():
   fig, ax = plt.subplots(1,3, figsize=(15, 5),dpi=1000)
   fig.suptitle(f"{full_name_prefix} spots detected")
 
-  def rotate_df(df, final_matrix):
-    df_mx = df.loc[:,('x','y')]
-    df_mx['1'] = 1
-    rotated_mx = (np.linalg.inv(final_matrix) @ df_mx.T).T
-    rotated_df = df.copy()
-    rotated_df['orig_x'] = df['x']
-    rotated_df['orig_y'] = df['y']
-    rotated_df['x'] = rotated.iloc[:,0]
-    rotated_df['y'] = rotated.iloc[:,1]
-    return rotated_df
-
   # rotating the image with the transform matrix based on the better linear fit
   df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
   datasave['dataframe'] = df_in_mask_rotated
 
   fig, ax = plt.subplots(4,1,figsize=(15,6),dpi = 600)
   fig.suptitle(f"{full_name_prefix} Final rotation and found spots")
-  masked_GFP = np.multiply(final_mask,GFP)
+  
   plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
   ax[0].imshow(transform_and_crop(segmented_image,final_tform), cmap=color_map)
   annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
