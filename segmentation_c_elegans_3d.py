@@ -174,9 +174,16 @@ def main():
   full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
   k, datasave, data = init_data(genotype, repnum, stage, RNAi, wormnumber)
   
+  if 'max_GFP' not in datasave or 'max_Brightfield' not in datasave or 'image_ZYXC' not in datasave:
+    max_GFP, max_Brightfield, image_ZYXC = read_into_max_projections(path_dir)
+    datasave['max_GFP'] = max_GFP
+    datasave['max_Brightfield'] = max_Brightfield
+    datasave['image_ZYXC'] = image_ZYXC
+  else:
+    max_GFP = datasave['max_GFP']
+    max_Brightfield = datasave['max_Brightfield']
+    image_ZYXC = datasave['image_ZYXC']
 
-
-  max_GFP, max_Brightfield, image_ZYXC = read_into_max_projections(path_dir)
   print('Range in GFP: min', np.min(max_GFP), 'max',np.max(max_GFP))
   print('Range in Brightfield: min', np.min(max_Brightfield), 'max',np.max(max_Brightfield))
 
@@ -488,7 +495,7 @@ def main():
   print("GFP and segmentation together", plotname)
   color_map = 'Greys_r'
 
-  SPOT_PARAMS =  (388,19)
+  SPOT_PARAMS =  None #(388,19)
 
   if SPOT_PARAMS is None:
     # Optimization from Luis!
