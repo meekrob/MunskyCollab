@@ -564,8 +564,6 @@ def main():
     selected_particle_size = particle_size_vector[selected_particle_size_index]
     print(selected_minmass)
     print(selected_particle_size)
-    datasave['minmass'] = selected_minmass
-    datasave['particle_size'] = selected_particle_size
 
     spots_detected_dataframe = tp.locate(GFP,diameter=selected_particle_size, minmass=selected_minmass) 
     df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
@@ -580,6 +578,9 @@ def main():
     selected_minmass, selected_particle_size = SPOT_PARAMS
     spots_detected_dataframe = tp.locate(GFP,diameter=selected_particle_size, minmass=selected_minmass) 
     df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
+
+  datasave['selected_spots_params'] = {'selected_minmass':selected_minmass,
+                                       'selected_particle_size':selected_particle_size}
   # rotating the image with the transform matrix based on the vertical fit
   df_mx = df_in_mask.loc[:,('x','y')]
   df_mx['1'] = 1
