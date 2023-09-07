@@ -156,7 +156,7 @@ def main():
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
-    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_3'
+    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
 
   os.chdir(path_dir)
   current_dir = pathlib.Path().absolute()
@@ -297,13 +297,12 @@ def main():
   datasave['masked_GFP'] = masked_GFP
 
   plot_center = np.array(segmented_image.T.shape)[:2]/2
-  print(segmented_image.shape)
-  print(-plot_center)
+  print(f"{segmented_image.shape=}")
   shift_to_plot_center = transform.EuclideanTransform(translation=-plot_center)
   cm = center_of_mass(segmented_image.T)
-  print(cm)
+  print("center of mass", cm)
   pc = np.array(segmented_image.T.shape)[:2]/2
-  print(pc)
+  print(f"{pc=}")
 
   """## Linear regression"""
 
