@@ -37,7 +37,9 @@ from cellpose import models
 from cellpose import plot
 
 from utils import *
+import json
 
+FLIP_X = False
 # helper functions to handle coordinates
 
 def in_range(x, low, high):
@@ -157,6 +159,7 @@ def main():
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
     path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+    #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
 
   os.chdir(path_dir)
   current_dir = pathlib.Path().absolute()
@@ -173,6 +176,20 @@ def main():
   wormnumber = shortname.split('_')[-1]
   full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
   k, datasave, data = init_data(genotype, repnum, stage, RNAi, wormnumber)
+
+  # read manual settings from a file in the same directory as the images,
+  # if they exist
+  SPOT_PARAMS = None #(388,19)
+  FLIP_X = False
+  json_filename = f"{full_name_prefix}_manual_params.json"
+  if os.path.exists(json_filename):
+    with open(json_filename, "r") as json_in:
+      user_params = json.load(json_in)
+      if 'SPOT_PARAMS' in user_params:
+        SPOT_PARAMS = user_params['SPOT_PARAMS']['minmass'], user_params['SPOT_PARAMS']['particle_size']
+      if 'FLIP_X' in user_params:
+        FLIP_X = user_params['FLIP_X']
+
   
   if 'max_GFP' not in datasave or 'max_Brightfield' not in datasave or 'image_ZYXC' not in datasave:
     max_GFP, max_Brightfield, image_ZYXC = read_into_max_projections(path_dir)
@@ -264,6 +281,7 @@ def main():
       print("done")
 
   print("Total time: %d seconds" % round(total_time))
+  datasave['masks_total'] = masks_total
 
   # Binarization
   print("Binarization")
@@ -505,8 +523,6 @@ def main():
   print("GFP and segmentation together", plotname)
   color_map = 'Greys_r'
 
-  SPOT_PARAMS =  None #(388,19)
-
   if SPOT_PARAMS is None:
     # Optimization from Luis!
     # Creating vectors to test all conditions for nuclei detection.
@@ -672,6 +688,16 @@ def main():
   plt.close()
 
   save_data(data)
+
+  params = {}
+  params['SPOT_PARAMS'] = {'minmass': int(selected_minmass), 'particle_size': int(selected_particle_size) }
+  params['FLIP_X'] = FLIP_X
+  params['experiment'] = {'genotype': genotype, 'stage': stage, 'repnum': repnum, 'wormnum': wormnumber, 'RNAi': RNAi}
+  
+  with open(json_filename, "w") as json_out:
+    json.dump(params, json_out, indent = 4)
+
+
 
 
 if __name__ == '__main__': main()
