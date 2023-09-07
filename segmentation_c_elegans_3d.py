@@ -296,6 +296,17 @@ def main():
   datasave['segmented_image'] = segmented_image
   datasave['masked_GFP'] = masked_GFP
 
+  fig, ax  = plt.subplots(2,1)
+  plotname = f"{full_name_prefix}_masked_images"
+  fig.suptitle(f"{full_name_prefix} masked Brightfield/GFP")
+  ax[0].imshow(segmented_image, cmap=color_map)
+  ax[0].set(title='masked brightfield')
+  ax[1].imshow(masked_GFP, cmap=color_map)
+  ax[1].set(title='masked GFP')
+  plt.savefig(plotname + '.png')
+  plt.close()
+
+
   plot_center = np.array(segmented_image.T.shape)[:2]/2
   print(f"{segmented_image.shape=}")
   shift_to_plot_center = transform.EuclideanTransform(translation=-plot_center)
