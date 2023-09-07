@@ -39,6 +39,8 @@ from cellpose import plot
 from utils import *
 import json
 
+USE_CACHED_MASK = False
+
 FLIP_X = False
 # helper functions to handle coordinates
 
@@ -158,7 +160,7 @@ def main():
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
-    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
+    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
     #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
 
   os.chdir(path_dir)
@@ -255,7 +257,7 @@ def main():
   total_time = 0
   pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{repnum}_mask.pickle")
 
-  if os.path.exists( pickled_mask_path ):
+  if USE_CACHED_MASK and os.path.exists( pickled_mask_path ):
     print("reading pickle...", end=" ")
     begin_time = time.time()
     with open(pickled_mask_path, "rb") as inpickle:
@@ -428,11 +430,15 @@ def main():
   shift_to_plot_center = transform.EuclideanTransform(translation= [plot_center[0],plot_center[1]])
   print("shift_to_plot_center", shift_to_plot_center)
 
+  ## FLIP or nah??????
+  flip = np.identity(3)
+  if FLIP_X: flip[0,0] = -1
+
   # horizontal angle
   angleH = math.atan(horiz_slope)
   print("horiz angle", math.degrees(angleH))
   rotation = transform.EuclideanTransform(rotation=angleH)
-  matrix_h = cf_horiz_shift.params @ rotation.params @ np.linalg.inv(shift_to_plot_center.params)
+  matrix_h = cf_horiz_shift.params @ rotation.params @ flip @ np.linalg.inv(shift_to_plot_center.params)
   tform_h = transform.EuclideanTransform(matrix_h)
   print("tform horiz", tform_h)
   tf_img_h = transform.warp(segmented_image, tform_h)
@@ -442,7 +448,7 @@ def main():
 
   print("vertical angle", math.degrees(angleV))
   rotation = transform.EuclideanTransform(rotation=angleV)
-  matrix_v =  shift_to_plot_center.params @ np.linalg.inv(rotation.params) @ cf_vertical_shift.params
+  matrix_v =  shift_to_plot_center.params @ flip @ np.linalg.inv(rotation.params)  @ cf_vertical_shift.params
   tform_v = transform.EuclideanTransform(matrix_v)
   print("tform vertical", tform_v)
   tf_img_v = transform.warp(segmented_image, tform_v.inverse)
@@ -527,9 +533,11 @@ def main():
     # Optimization from Luis!
     # Creating vectors to test all conditions for nuclei detection.
     number_optimization_steps = 10
-    particle_size_vector = [num for num in range(13, 25 + 1) if num % 2 != 0][:number_optimization_steps]
+    particle_size_vector = [num for num in range(15, 27 + 1) if num % 2 != 0][:number_optimization_steps]
+    #particle_size_vector = [num for num in range(21, 33 + 1) if num % 2 != 0][:number_optimization_steps]
     print('particle_size_vector: ', particle_size_vector)
     minmass_vector = np.linspace(250, 500, num=number_optimization_steps, endpoint=True,dtype=int)
+    #minmass_vector = np.linspace(450, 550, num=number_optimization_steps, endpoint=True,dtype=int)
     print('minmass_vector: ', minmass_vector)
 
     fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1, 
