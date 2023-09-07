@@ -6,6 +6,7 @@ from os.path import isfile, join
 import pickle 
 from skimage.io import imread   # Module from skimage to read images as numpy arrays
 import numpy as np
+import matplotlib.pyplot as plt
 
 def read_into_max_projections(path_dir):
   os.chdir(path_dir)
@@ -94,3 +95,45 @@ def load_data(filename):
     print("done")
   key = list(data.keys())[0]
   return key, data[key], data
+
+def annotate_spots(df, GFP, ax, plot_styles = {}):
+  # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
+  scatter_args = {
+  'edgecolors' : "r",
+  'linewidths' : 2,
+  'alpha' : .5,
+  'marker' : 'o',
+  's': 5,
+  'facecolors' : 'g'
+  }
+  plot_styles = plot_styles.copy()
+  for k in scatter_args.keys():
+    if k in plot_styles:
+      scatter_args[k] = plot_styles[k]
+      del plot_styles[k]
+
+  print(scatter_args)
+
+  x = list(df.loc[:,'x'])
+  y = list(df.loc[:,'y'])
+  markersizes = list(df.loc[:,'size'] * scatter_args['s'])
+
+  
+  print("plot_styles ", plot_styles)
+
+  # basically transferred this from trackpy.annotate, allowing for more control
+  _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
+  ax.imshow(GFP, **_imshow_style)
+  ax.set_xlim(-0.5, GFP.shape[1] - 0.5)
+  ax.set_ylim(-0.5, GFP.shape[0] - 0.5)
+  ax.scatter(x, y, s = markersizes, edgecolors = scatter_args['edgecolors'], 
+             linewidths = scatter_args['linewidths'], 
+             alpha = scatter_args['alpha'],
+             marker = scatter_args['marker'], facecolors = scatter_args['facecolors'],
+             **plot_styles)
+  
+  bottom, top = ax.get_ylim()
+  if top > bottom:
+    ax.set_ylim(top, bottom, auto=None)
+
+  return ax
