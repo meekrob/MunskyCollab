@@ -88,9 +88,10 @@ def save_data(data):
     pickle.dump(data, outpickle)
     print("done")
 
-def load_data(filename):
-  print("reading pickle...", end=" ")
-  with open(filename, "rb") as inpickle:
+def load_data(pathname):
+  filename = os.path.basename(pathname)
+  print(f"reading pickle from {filename}...", end=" ")
+  with open(pathname, "rb") as inpickle:
     data = pickle.load(inpickle)
     print("done")
   key = list(data.keys())[0]
@@ -112,14 +113,9 @@ def annotate_spots(df, GFP, ax, plot_styles = {}):
       scatter_args[k] = plot_styles[k]
       del plot_styles[k]
 
-  print(scatter_args)
-
   x = list(df.loc[:,'x'])
   y = list(df.loc[:,'y'])
   markersizes = list(df.loc[:,'size'] * scatter_args['s'])
-
-  
-  print("plot_styles ", plot_styles)
 
   # basically transferred this from trackpy.annotate, allowing for more control
   _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
@@ -137,3 +133,5 @@ def annotate_spots(df, GFP, ax, plot_styles = {}):
     ax.set_ylim(top, bottom, auto=None)
 
   return ax
+
+

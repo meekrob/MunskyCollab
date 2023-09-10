@@ -39,7 +39,7 @@ from cellpose import plot
 from utils import *
 import json
 
-USE_CACHED_MASK = False
+USE_CACHED_MASK = True
 
 FLIP_X = False
 # helper functions to handle coordinates
@@ -709,3 +709,5 @@ def main():
 
 
 if __name__ == '__main__': main()
+
+
