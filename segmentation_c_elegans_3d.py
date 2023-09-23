@@ -12,178 +12,140 @@ import pathlib  # Library to work with file paths
 import os; from os import listdir; from os.path import isfile, join
 import re
 import glob
-from skimage.io import imread        # Module from skimage to read images as numpy arrays
-from skimage import transform
+
 import tifffile as tiff
 import math
 # # Loading libraries
 import random                        # Library to generate random numbers
-import skimage                       # Library for image manipulation
+
 import numpy as np                   # Library for array manipulation
+print("importing matplotlib...", file=sys.stderr, end="", flush=True)
 import matplotlib.pyplot as plt      # Library used for plotting
 from matplotlib import transforms
+print("done", file=sys.stderr)
+
+print("importing skimage...", file=sys.stderr, end="", flush=True)
+import skimage                       # Library for image manipulation
+from skimage.io import imread        # Module from skimage to read images as numpy arrays
+from skimage import transform
 from skimage.filters import gaussian # Module working with a gaussian filter
 from skimage.measure import label, regionprops
 from skimage.morphology import square, dilation
 from skimage import measure
+print("done", file=sys.stderr)
+
+print("importing scipy...", file=sys.stderr, end="", flush=True)
 from scipy.ndimage import gaussian_filter, center_of_mass
 from scipy.spatial import distance
+print("done", file=sys.stderr)
 
 # for the cellpose step (calculating the mask), time the passes through the loop, save the data to skip the processing in
 # future invocations
 import time
 import pickle
+print("importing cellpose...", file=sys.stderr, flush=True, end="")
 from cellpose import models
-from cellpose import plot
+#from cellpose import plot
+print("done", file=sys.stderr)
 
 from utils import *
 import json
 
+from optparse import OptionParser
+
 USE_CACHED_MASK = True
-
 FLIP_X = False
-# helper functions to handle coordinates
-
-def in_range(x, low, high):
-  if x >= low and x <= high: return x
-  return None
-
-def line_in_box(line, x0, y0, w, h):
-  # return (x,y) the coordinates of the line intersecting
-  # the box in the order: bottom, left, top, right
-  # If the line does not intersect the given boundary,
-  # the tuple is None.
-  # An intersecting line has two intersected boundaries,
-  # none if it doesn't (returns None, None, None, None)
-  m, b = line
-
-  # x or y coordinate will be None if out of range
-  # otherwise it's the point of intersection for the
-  # given boundary
-  bottom = (in_range(-b/m, 0, w), 0)
-  right = (w, in_range(m*w + b, 0, h))
-  left = (0, in_range(b, 0, h))
-  top = (in_range((h-b)/m, 0, w), h)
-
-  # for any out-of-range coordinates, use None for the whole tuple
-  if bottom[0] is None: bottom = None
-  if right[1] is None: right = None
-  if left[1] is None: left = None
-  if top[0] is None: top = None
-
-  return bottom, left, top, right
-
-def isect_line_box(line, x0, y0, w, h):
-  bltr = line_in_box(line, x0, y0, w, h)
-  x = [ coord[0] for coord in bltr if coord is not None]
-  y = [ coord[1] for coord in bltr if coord is not None]
-  # returns empty lists if the line doesn't intersect
-  return x, y
-
-# substitute for trackpy.annotate: more choices in graphing 
-def annotate_spots(df, GFP, ax, plot_styles = {}):
-  # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
-  scatter_args = {
-  'edgecolors' : "r",
-  'linewidths' : 2,
-  'alpha' : .5,
-  'marker' : 'o',
-  's': 5,
-  'facecolors' : 'g'
-  }
-  plot_styles = plot_styles.copy()
-  for k in scatter_args.keys():
-    if k in plot_styles:
-      scatter_args[k] = plot_styles[k]
-      del plot_styles[k]
-
-  print(scatter_args)
-
-  x = list(df.loc[:,'x'])
-  y = list(df.loc[:,'y'])
-  markersizes = list(df.loc[:,'size'] * 1.5)
-
-  
-  print("plot_styles ", plot_styles)
-
-  # basically transferred this from trackpy.annotate, allowing for more control
-  _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
-  ax.imshow(GFP, **_imshow_style)
-  ax.set_xlim(-0.5, GFP.shape[1] - 0.5)
-  ax.set_ylim(-0.5, GFP.shape[0] - 0.5)
-  ax.scatter(x, y, s = scatter_args['s'], edgecolors = scatter_args['edgecolors'], 
-             linewidths = scatter_args['linewidths'], 
-             alpha = scatter_args['alpha'],
-             marker = scatter_args['marker'], facecolors = scatter_args['facecolors'],
-             **plot_styles)
-  
-  bottom, top = ax.get_ylim()
-  if top > bottom:
-    ax.set_ylim(top, bottom, auto=None)
-
-  return ax
-
-def rotate_df(df, final_matrix):
-    df_mx = df.loc[:,('x','y')]
-    df_mx['1'] = 1
-    rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
-    rotated_df = df.copy()
-    rotated_df['orig_x'] = df['x']
-    rotated_df['orig_y'] = df['y']
-    rotated_df['x'] = rotated.iloc[:,0]
-    rotated_df['y'] = rotated.iloc[:,1]
-    return rotated_df
-
-# from Luis
-def spots_in_mask(df,masks):
-    # extracting the contours in the image
-    coords = np.array([df.y, df.x]).T # These are the points detected by trackpy
-    coords_int = np.round(coords).astype(int)  # or np.floor, depends
-    values_at_coords = masks[tuple(coords_int.T)] # If 1 the value is in the mask
-    df['In Mask']=values_at_coords # Check if pts are on/in polygon mask
-    condition = df['In Mask'] ==1
-    selected_rows = df[condition]
-    
-    return selected_rows.drop(columns=['In Mask'])
-
-def transform_and_crop(image, tform):
-  tformed = transform.warp(image, tform)
-  x,y = tformed.nonzero()
-  return tformed[:max(x),:max(y)]
+SPOT_PARAMS = None #(388,19)
 
 
 def main():
-  print("reading directory")
+  USAGE = "[prog] image-set-path"
+  parser = OptionParser(USAGE)
+  parser.add_option("--ignore-flipx-setting", dest="ignore_flipx", 
+                    default = False,
+                    action="store_true",
+                    help="if FLIP_X found in JSON, ignore it.")
+  parser.add_option("-j", "--json-file", dest="json_path",
+                    default="",
+                    type="string",
+                    help="manually provide the json settings file [default: based on parsed path name].")
+  parser.add_option("--recalculate-mask", dest = "recalculate_mask",
+                    default = False,
+                    action="store_true",
+                    help="Recalculate mask, even if it is stored in the pickle file.")
+  parser.add_option("-p", "--pickle-file", dest="pickle_file",
+                    type="string",
+                    help="Specify location of pickle file [default: based on parsed path name].")
+  parser.add_option("-x", "--get-exp-from-json", dest="get_exp_from_json",
+                    default=False,
+                    action="store_true",
+                    help="Get info about the experiment (genotype,RNAi,Worm,Rep) from the json file. Requires, -j, --json-file)")
+  
+  (options, args) = parser.parse_args()
 
-  if len(sys.argv) > 1:
-    path_dir = sys.argv[1]
+  if len(args) > 0:
+    path_dir = args[0]
+    print("argument provided:", path_dir)
+    
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
     path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
     #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
+    print("no argument provided.\nDefaulting to", path_dir)
 
+  if options.get_exp_from_json and not options.json_file:
+      print("option -x,--get-exp-from-json requires -j,--json-file to be specified.", file=sys.stderr)
+      sys.exit(1)
+    
+  if options.get_exp_from_json and options.json_path:
+    if os.path.exists(options.json_path):
+      with open(options.json_path, "r") as json_in:
+        user_params = json.load(json_in)
+        try:
+          genotype =    user_params['experiment']['genotype']
+          stage =       user_params['experiment']['stage']
+          repnum =      user_params['experiment']['repnum']
+          wormnumber =  user_params['experiment']['wormnum']
+          RNAi =        user_params['experiment']['RNAi'] 
+        except:
+          print("JSON file requires genotype, RNAi, etc., with the -x,--get-exp-from-json but not all are specified.", file=sys.stderr)
+          sys.exit(1)
+
+    else:
+      print(f"User argument -x,--get-exp-from-json requires data stored in a json file {options.json_path=} but it doesn't exist.")
+      sys.exit(1)
+  if options.recalculate_mask:
+    USE_CACHED_MASK = False
+
+  # change to the user-supplied directory now for the rest of input/output
+  print("Parsing", path_dir)
   os.chdir(path_dir)
   current_dir = pathlib.Path().absolute()
-  
+
   # get worm info from path and filename
   try:
-    longname,RNAi,stage,shortname = path_dir.split(os.path.sep)[-4:]
-    # i.e.  201124_JM259_elt-2_Promoter_Rep_1, ELT-2_RNAi, L1, JM259_L1_ELT-2_worm_1
-    datestr, genotype, labl, _, __, repnum = longname.split('_')
-  except ValueError:
-    print("Error parsing: `%s`" % longname)
+    print("Parsing genotype, RNAi, stage, worm from path.")
+    longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
+    named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
+    genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
+    
+  except:
+    print("Error parsing: `%s`" % longname, file=sys.stderr)
+    print(f"Expected last 4 directories of the path to follow the following pattern: \d+_(\\S+)_elt-2_Promoter_Rep_\\S+", file=sys.stderr)
+    print("Example: 201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1", file=sys.stderr)
     raise
 
-  wormnumber = shortname.split('_')[-1]
   full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
+  print("finished parsing", full_name_prefix)
   k, datasave, data = init_data(genotype, repnum, stage, RNAi, wormnumber)
 
   # read manual settings from a file in the same directory as the images,
   # if they exist
-  SPOT_PARAMS = None #(388,19)
-  FLIP_X = False
-  json_filename = f"{full_name_prefix}_manual_params.json"
+  if options.json_file:
+    json_filename = options.json_file
+  else:
+    json_filename = f"{full_name_prefix}_manual_params.json"
   if os.path.exists(json_filename):
     with open(json_filename, "r") as json_in:
       user_params = json.load(json_in)
@@ -255,7 +217,7 @@ def main():
   masks_total = np.zeros_like(max_Brightfield)
 
   total_time = 0
-  pickled_mask_path = os.path.join(current_dir, f"{datestr}_{genotype}_{RNAi}_{repnum}_mask.pickle")
+  pickled_mask_path = os.path.join(current_dir, f"{full_name_prefix}_mask.pickle")
 
   if USE_CACHED_MASK and os.path.exists( pickled_mask_path ):
     print("reading pickle...", end=" ")
@@ -615,6 +577,7 @@ def main():
 
   datasave['selected_spots_params'] = {'selected_minmass':selected_minmass,
                                        'selected_particle_size':selected_particle_size}
+
   # rotating the image with the transform matrix based on the vertical fit
   df_mx = df_in_mask.loc[:,('x','y')]
   df_mx['1'] = 1
@@ -670,7 +633,7 @@ def main():
   spots_detected_dataframe['Rep'] = repnum
   spots_detected_dataframe['RNAi'] = RNAi
   spots_detected_dataframe['Genotype'] = genotype
-  spots_detected_dataframe.to_csv(f"{datestr}_{genotype}_{RNAi}_{repnum}_segmented_plot.csv")
+  spots_detected_dataframe.to_csv(f"{full_name_prefix}_segmented_plot.csv")
   datasave['spots_detected_dataframe'] = spots_detected_dataframe
 
 
@@ -705,8 +668,118 @@ def main():
   with open(json_filename, "w") as json_out:
     json.dump(params, json_out, indent = 4)
 
+# helper functions to handle coordinates
+def in_range(x, low, high):
+  if x >= low and x <= high: return x
+  return None
 
+def line_in_box(line, x0, y0, w, h):
+  # return (x,y) the coordinates of the line intersecting
+  # the box in the order: bottom, left, top, right
+  # If the line does not intersect the given boundary,
+  # the tuple is None.
+  # An intersecting line has two intersected boundaries,
+  # none if it doesn't (returns None, None, None, None)
+  m, b = line
 
+  # x or y coordinate will be None if out of range
+  # otherwise it's the point of intersection for the
+  # given boundary
+  bottom = (in_range(-b/m, 0, w), 0)
+  right = (w, in_range(m*w + b, 0, h))
+  left = (0, in_range(b, 0, h))
+  top = (in_range((h-b)/m, 0, w), h)
+
+  # for any out-of-range coordinates, use None for the whole tuple
+  if bottom[0] is None: bottom = None
+  if right[1] is None: right = None
+  if left[1] is None: left = None
+  if top[0] is None: top = None
+
+  return bottom, left, top, right
+
+def isect_line_box(line, x0, y0, w, h):
+  bltr = line_in_box(line, x0, y0, w, h)
+  x = [ coord[0] for coord in bltr if coord is not None]
+  y = [ coord[1] for coord in bltr if coord is not None]
+  # returns empty lists if the line doesn't intersect
+  return x, y
+
+# substitute for trackpy.annotate: more choices in graphing 
+def annotate_spots(df, GFP, ax, plot_styles = {}):
+  # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
+  scatter_args = {
+  'edgecolors' : "r",
+  'linewidths' : 2,
+  'alpha' : .5,
+  'marker' : 'o',
+  's': 5,
+  'facecolors' : 'g'
+  }
+  plot_styles = plot_styles.copy()
+  for k in scatter_args.keys():
+    if k in plot_styles:
+      scatter_args[k] = plot_styles[k]
+      del plot_styles[k]
+
+  print(scatter_args)
+
+  x = list(df.loc[:,'x'])
+  y = list(df.loc[:,'y'])
+  markersizes = list(df.loc[:,'size'] * 1.5)
+
+  
+  print("plot_styles ", plot_styles)
+
+  # basically transferred this from trackpy.annotate, allowing for more control
+  _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
+  ax.imshow(GFP, **_imshow_style)
+  ax.set_xlim(-0.5, GFP.shape[1] - 0.5)
+  ax.set_ylim(-0.5, GFP.shape[0] - 0.5)
+  ax.scatter(x, y, s = scatter_args['s'], edgecolors = scatter_args['edgecolors'], 
+             linewidths = scatter_args['linewidths'], 
+             alpha = scatter_args['alpha'],
+             marker = scatter_args['marker'], facecolors = scatter_args['facecolors'],
+             **plot_styles)
+  
+  bottom, top = ax.get_ylim()
+  if top > bottom:
+    ax.set_ylim(top, bottom, auto=None)
+
+  return ax
+
+def rotate_df(df, final_matrix):
+    df_mx = df.loc[:,('x','y')]
+    df_mx['1'] = 1
+    rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
+    rotated_df = df.copy()
+    rotated_df['orig_x'] = df['x']
+    rotated_df['orig_y'] = df['y']
+    rotated_df['x'] = rotated.iloc[:,0]
+    rotated_df['y'] = rotated.iloc[:,1]
+    return rotated_df
+
+# from Luis
+def spots_in_mask(df,masks):
+    # extracting the contours in the image
+    coords = np.array([df.y, df.x]).T # These are the points detected by trackpy
+    coords_int = np.round(coords).astype(int)  # or np.floor, depends
+    values_at_coords = masks[tuple(coords_int.T)] # If 1 the value is in the mask
+    df['In Mask']=values_at_coords # Check if pts are on/in polygon mask
+    condition = df['In Mask'] ==1
+    selected_rows = df[condition]
+    
+    return selected_rows.drop(columns=['In Mask'])
+
+def transform_and_crop(image, tform):
+  tformed = transform.warp(image, tform)
+  x,y = tformed.nonzero()
+  return tformed[:max(x),:max(y)]
+
+def numpy_regression(x,y, rcond=None):
+  A = np.vstack([x, np.ones(len(x))]).T
+  fit = np.linalg.lstsq(A, y, rcond=rcond)
+  return fit
 
 if __name__ == '__main__': main()
 
