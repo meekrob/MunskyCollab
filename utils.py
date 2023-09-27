@@ -21,38 +21,37 @@ def read_into_max_projections(path_dir):
   list_images = [imread(str(f)) for f in path_files]
   # Reading the microscopy data
   number_images = len(path_files)
-  print('Number of images in file: ', number_images)
-  print('The images are stored in the following folder: ', path_dir)
+  # print('Number of images in file: ', number_images)
+  # print('The images are stored in the following folder: ', path_dir)
 
   """# Reading all images and converting them into form ZYXC."""
   # Separating images based on the color channel
-  print("Separating images based on the color channel")
+  print("\tSeparating images based on the color channel")
   selected_elements_Overlay = [element for element in path_files if 'Overlay.tif' in element]
   selected_elements_CH2 = [element for element in path_files if 'CH2.tif' in element]
   selected_elements_CH4 = [element for element in path_files if 'CH4.tif' in element]
 
   # Reading all images in each list.
-  print("Reading all images in each list.")
+  print("\tReading all images in each list.")
   list_images_CH2_full = [imread(str(f)) for f in selected_elements_CH2]  # [Y,X,3C]  Color channels 0 and 2 are empty. Use channel 1
   list_images_CH2 = [img[:,:,1] for img in list_images_CH2_full] #
   list_images_CH4 = [imread(str(f)) for f in selected_elements_CH4]  # [Y,X]   It appears to be to contain the same information as Overlay
   list_images_Overlay = [imread(str(f)) for f in selected_elements_Overlay] # [Y,X,3C]  # It has 3 color channels but all appear to contain the same information
 
   # Creating 3D arrays with all images in the list
-  print("Creating 3D arrays with all images in the list")
+  print("\tCreating 3D arrays with all images in the list")
   images_CH2_3d = np.stack(list_images_CH2)
   images_C4_3d = np.stack(list_images_CH4)
 
   # Creating a 4D array with shape ZYXC.  GFP
-  print("Creating a 4D array with shape ZYXC.  GFP")
   array4d = np.concatenate((images_CH2_3d[np.newaxis, ...], images_C4_3d[np.newaxis, ...]), axis=0)
   # Move the axis from position 0 to position 2
-  print("Move the axis from position 0 to position 2")
   image_ZYXC = np.moveaxis(array4d, 0, 3)
-  print('Final image shape: ', image_ZYXC.shape, '\nGFP is channel 0 \nBrightfield is channel 1')
+  print('\tFinal image shape:', image_ZYXC.shape) 
+  print('\tGFP is channel 0')
+  print('\tBrightfield is channel 1')
 
-  # Plotting maximum projection
-  print("Plotting maximum projection")
+  # return maximum projections and original
   max_GFP = np.max(image_ZYXC[:,:,:,0],axis=0)
   max_Brightfield = np.max(image_ZYXC[:,:,:,1],axis=0)
   return max_GFP, max_Brightfield, image_ZYXC
