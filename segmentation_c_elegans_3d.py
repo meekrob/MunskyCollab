@@ -49,9 +49,6 @@ import json
 
 from optparse import OptionParser
 
-
-
-
 def main():
   USAGE = "[prog] image-set-path"
 
@@ -87,13 +84,17 @@ def main():
   if len(args) > 0:
     path_dir = args[0]
     print("argument provided:", path_dir)
-    
+
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
     path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
     #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
     print("no argument provided.\nDefaulting to", path_dir)
+
+  if not os.path.exists(path_dir):
+    print("input path not found:", path_dir, file=sys.stderr)
+    sys.exit(1)
 
   # read manual settings from a file in the same directory as the images,
   # if they exist
@@ -301,6 +302,9 @@ def main():
           # Set the region in the new mask
           final_mask[coords[:, 0], coords[:, 1]] = 1
 
+  if final_mask.max() == 0:
+    raise "everything masked"
+  
 
   # Mask by image
   segmented_image = np.multiply(final_mask,max_Brightfield)
