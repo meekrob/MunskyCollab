@@ -580,7 +580,7 @@ def main():
         ax[i,j+1].set(title=f'{particle_size};{mm}; {len(df_in_mask)} spots')
 
         del spots_detected_dataframe, df_in_mask
-    print()
+
 
     metric = metric.astype(int)
 
@@ -588,9 +588,9 @@ def main():
     selected_minmass_index, selected_particle_size_index = np.unravel_index(metric.argmax(), metric.shape)
     selected_minmass = minmass_vector[selected_minmass_index]
     selected_particle_size = particle_size_vector[selected_particle_size_index]
-    
     spots_detected_dataframe = tp.locate(GFP,diameter=selected_particle_size, minmass=selected_minmass) 
     df_in_mask = spots_in_mask(df=spots_detected_dataframe,masks=final_mask)
+    print(f'Selected params: {selected_particle_size=}, {selected_minmass=}. {len(df_in_mask)} spots')
     # plot the "best" one underneath the brightfield/mask/GFP
     ax[4,0].set(title=f'Selected params: {selected_particle_size}, {selected_minmass}. {len(df_in_mask)} spots')
     # add plot with different parameters to grid    
