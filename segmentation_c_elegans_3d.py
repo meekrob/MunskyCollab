@@ -700,29 +700,24 @@ def isect_line_box(line, x0, y0, w, h):
 def annotate_spots(df, GFP, ax, plot_styles = {}):
   # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
   scatter_args = {
-  'edgecolors' : "r",
-  'linewidths' : 2,
-  'alpha' : .5,
-  'marker' : 'o',
-  's': 5,
-  'facecolors' : 'g'
+    'edgecolors' : "r",
+    'linewidths' : 2,
+    'alpha' : .5,
+    'marker' : 'o',
+    's': 5,
+    'facecolors' : 'g'
   }
+  # integrate params into plot_styles obj
   plot_styles = plot_styles.copy()
   for k in scatter_args.keys():
     if k in plot_styles:
       scatter_args[k] = plot_styles[k]
       del plot_styles[k]
-
-  #print(scatter_args)
-
+  # get coordinates
   x = list(df.loc[:,'x'])
   y = list(df.loc[:,'y'])
   markersizes = list(df.loc[:,'size'] * 1.5)
-
-  
-  #print("plot_styles ", plot_styles)
-
-  # basically transferred this from trackpy.annotate, allowing for more control
+  # from trackpy.annotate...
   _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
   ax.imshow(GFP, **_imshow_style)
   ax.set_xlim(-0.5, GFP.shape[1] - 0.5)
@@ -740,9 +735,12 @@ def annotate_spots(df, GFP, ax, plot_styles = {}):
   return ax
 
 def rotate_df(df, final_matrix):
+    # prepare transform matrix
     df_mx = df.loc[:,('x','y')]
     df_mx['1'] = 1
+    # perform transform
     rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
+    # store result and retain original coordinates
     rotated_df = df.copy()
     rotated_df['orig_x'] = df['x']
     rotated_df['orig_y'] = df['y']
@@ -750,7 +748,7 @@ def rotate_df(df, final_matrix):
     rotated_df['y'] = rotated.iloc[:,1]
     return rotated_df
 
-# from Luis
+# from Luis: select only the spots in the mask using their coordinates (df)
 def spots_in_mask(df,masks):
     # extracting the contours in the image
     coords = np.array([df.y, df.x]).T # These are the points detected by trackpy
