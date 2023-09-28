@@ -109,6 +109,26 @@ def main():
       else:
         json_filename = alt_json_filename
   else:
+      # get worm info from path and filename
+    try:
+      print("Parsing genotype, RNAi, stage, worm from path.")
+      longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
+      named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
+      genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
+      print(f"\t{genotype=}")
+      print(f"\t{repnum=}")
+      print(f"\t{RNAi=}")
+      print(f"\t{stage=}")
+      print(f"\t{wormnumber=}")
+      
+    except:
+      print("Error parsing: `%s`" % longname, file=sys.stderr)
+      print(f"Expected last 4 directories of the path to follow the following pattern: \d+_(\\S+)_elt-2_Promoter_Rep_\\S+", file=sys.stderr)
+      print("Example: 201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1", file=sys.stderr)
+      raise
+
+    full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
+    print(f"{full_name_prefix=}")
     json_filename = f"{full_name_prefix}_manual_params.json"
 
   # need to make sure this is still valid after we change directories
@@ -150,26 +170,7 @@ def main():
   os.chdir(path_dir)
   current_dir = pathlib.Path().absolute()
 
-  # get worm info from path and filename
-  try:
-    print("Parsing genotype, RNAi, stage, worm from path.")
-    longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
-    named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
-    genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
-    print(f"\t{genotype=}")
-    print(f"\t{repnum=}")
-    print(f"\t{RNAi=}")
-    print(f"\t{stage=}")
-    print(f"\t{wormnumber=}")
-    
-  except:
-    print("Error parsing: `%s`" % longname, file=sys.stderr)
-    print(f"Expected last 4 directories of the path to follow the following pattern: \d+_(\\S+)_elt-2_Promoter_Rep_\\S+", file=sys.stderr)
-    print("Example: 201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1", file=sys.stderr)
-    raise
 
-  full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
-  print(f"{full_name_prefix=}")
   k, datasave, data = init_data(genotype, repnum, stage, RNAi, wormnumber)
 
   
@@ -235,8 +236,6 @@ def main():
   plt.close()
 
   color_map = 'Greys_r'
-
-
 
   total_time = 0
   pickled_mask_path = os.path.join(current_dir, f"{full_name_prefix}_mask.pickle")
