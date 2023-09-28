@@ -1,6 +1,8 @@
 .DS_Store
 data/
+segmentation/
 *.swp
+*.png
 
 # R
 .Rproj.user/
