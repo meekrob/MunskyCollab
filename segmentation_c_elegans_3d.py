@@ -319,33 +319,23 @@ def main():
   plt.savefig(plotname + '.png')
   plt.close()
 
-
   plot_center = np.array(segmented_image.T.shape)[:2]/2
-  # print(f"{segmented_image.shape=}")
   shift_to_plot_center = transform.EuclideanTransform(translation=-plot_center)
   cm = center_of_mass(segmented_image.T)
-  # print("center of mass", cm)
   pc = np.array(segmented_image.T.shape)[:2]/2
-  # print(f"{pc=}")
 
   """## Linear regression"""
-
   minmax = lambda x: (min(x), max(x))
   x,y = segmented_image.T.nonzero()
-  # print("min/max y:", minmax(y))
-  # print("min/max x:", minmax(x))
   # horizontal line through worm
   A = np.vstack([x, np.ones(len(x))]).T
   horiz_fit = np.linalg.lstsq(A, y, rcond=None)
   horiz_slope, horiz_intercept = horiz_fit[0]
-  #print(f"Horizontal: {horiz_slope=}, intercept {round(horiz_intercept)}, SS Resid {horiz_fit[1]}")
 
   # vertical line through worm
-  #x, y = segmented_image.T.nonzero()
   A = np.vstack([y, np.ones(len(y))]).T
   vertical_fit = np.linalg.lstsq(A, x, rcond=None)
   vertical_slope, vertical_intercept = vertical_fit[0]
-  # print(f"Vertical: {vertical_slope=}, intercept {round(vertical_intercept)}, SS Resid {vertical_fit[1]}")
 
   horiz_line = lambda a: a*horiz_slope + horiz_intercept
   vertical_line = lambda a: a*vertical_slope + vertical_intercept
@@ -354,13 +344,9 @@ def main():
   vertical_line_inv = lambda a: (a-vertical_intercept)/vertical_slope
 
   m,b = vertical_fit[0]
-  # print(f"{m=}, {b=}")
-  inverse_m = 1 / m
-  # print(f"{inverse_m=}")
+  inverse_m = 1 / m # why isn't it -1 / m?
   horiz_angle_correction = math.atan(horiz_slope)
   inverse_vertical_angle_correction = math.atan(inverse_m)
-  # print(f"{math.degrees(horiz_angle_correction)=}")
-  # print(f"{math.degrees(inverse_vertical_angle_correction)=}")
 
   img_height, img_width = segmented_image.shape
 
@@ -370,22 +356,14 @@ def main():
   ymax = img_height
 
   # horiz
-  # print(f"{horiz_fit[0]=}")
   horiz_xbounds, horiz_ybounds = isect_line_box(horiz_fit[0], 0, 0, img_width, img_height)
   horiz_xseries = np.linspace(horiz_xbounds[0], horiz_xbounds[1],3)
   horiz_yseries = np.linspace(horiz_ybounds[0], horiz_ybounds[1],3)
-  # print("horizontal line coordinates")
-  # print(f"{horiz_xseries=}")
-  # print(f"{horiz_yseries=}")
 
   # vert
-  # print(f"{vertical_fit[0]=}")
   vertical_ybounds, vertical_xbounds = isect_line_box(vertical_fit[0], 0, 0, img_height, img_width)
   vertical_xseries = np.linspace(vertical_xbounds[0], vertical_xbounds[1],3)
   vertical_yseries = np.linspace(vertical_ybounds[0], vertical_ybounds[1],3)
-  # print("vertical line coordinates")
-  # print(f"{vertical_xseries=}")
-  # print(f"{vertical_yseries=}")
 
   # center of fitted line (horizontal)
   cf_horiz = (horiz_xseries[1],horiz_yseries[1])
@@ -414,12 +392,8 @@ def main():
   cf_horiz_shift = transform.EuclideanTransform(translation=[cf_horiz[0],cf_horiz[1]])
   cf_vertical_shift = transform.EuclideanTransform(translation=[-cf_vertical[0],-cf_vertical[1]])
 
-  # print("translate center of horizontal fit", cf_horiz_shift)
-  # print("translate center of vertical fit", cf_vertical_shift)
-
   # shift the origin back to the plot center
   shift_to_plot_center = transform.EuclideanTransform(translation= [plot_center[0],plot_center[1]])
-  # print("shift_to_plot_center", shift_to_plot_center)
 
   ## FLIP or nah??????
   flip = np.identity(3)
@@ -427,21 +401,17 @@ def main():
 
   # horizontal angle
   angleH = math.atan(horiz_slope)
-  # print("horiz angle", math.degrees(angleH))
   rotation = transform.EuclideanTransform(rotation=angleH)
   matrix_h = cf_horiz_shift.params @ rotation.params @ flip @ np.linalg.inv(shift_to_plot_center.params)
   tform_h = transform.EuclideanTransform(matrix_h)
-  # print("tform horiz", tform_h)
   tf_img_h = transform.warp(segmented_image, tform_h)
 
   # vertical
   angleV = inverse_vertical_angle_correction
 
-  # print("vertical angle", math.degrees(angleV))
   rotation = transform.EuclideanTransform(rotation=angleV)
   matrix_v =  shift_to_plot_center.params @ flip @ np.linalg.inv(rotation.params)  @ cf_vertical_shift.params
   tform_v = transform.EuclideanTransform(matrix_v)
-  # print("tform vertical", tform_v)
   tf_img_v = transform.warp(segmented_image, tform_v.inverse)
 
   ax[1,0].imshow(tf_img_h, cmap=color_map)
@@ -453,11 +423,9 @@ def main():
 
   # choose the transform coming from the better fit
   if horiz_fit[1] < vertical_fit[1]:
-    # print("using horiz fit")
     matrix = matrix_h
     tform = tform_h
   else:
-    # print("using vertical fit")
     matrix = np.linalg.inv(matrix_v)
     tform = tform_v.inverse
 
@@ -482,8 +450,6 @@ def main():
   rotated_image = transform.warp(segmented_image, final_tform, output_shape = (img_height * 2, img_width * 2))
 
   x,y = rotated_image.nonzero()
-  # print("after rotation min/max y:", minmax(y))
-  # print("after rotation min/max x:", minmax(x))
   cropped_image = rotated_image[:max(x),:max(y)]
   datasave['cropped_image'] = cropped_image
   ax[2,1].imshow(cropped_image, cmap=color_map)
@@ -499,7 +465,6 @@ def main():
   GFP = max_GFP.copy()
 
   particle_size = 21 # according to the documentation must be an odd number 3,5,7,9 etc.
-  #fig, ax = plt.subplots(1,1, figsize=(4, 4))
   spots_detected_dataframe_all = tp.locate(GFP, diameter=particle_size, minmass=0)
 
   # This section generates a histogram with the intensity of the detected particles in the image.
@@ -524,10 +489,8 @@ def main():
     # Creating vectors to test all conditions for nuclei detection.
     number_optimization_steps = 10
     particle_size_vector = [num for num in range(15, 27 + 1) if num % 2 != 0][:number_optimization_steps]
-    #particle_size_vector = [num for num in range(21, 33 + 1) if num % 2 != 0][:number_optimization_steps]
     print('\tparticle_size_vector: ', particle_size_vector)
     minmass_vector = np.linspace(250, 500, num=number_optimization_steps, endpoint=True,dtype=int)
-    #minmass_vector = np.linspace(450, 550, num=number_optimization_steps, endpoint=True,dtype=int)
     print('\tminmass_vector: ', minmass_vector)
 
     fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1, 
@@ -580,7 +543,6 @@ def main():
         ax[i,j+1].set(title=f'{particle_size};{mm}; {len(df_in_mask)} spots')
 
         del spots_detected_dataframe, df_in_mask
-
 
     metric = metric.astype(int)
 
