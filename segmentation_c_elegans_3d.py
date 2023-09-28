@@ -525,10 +525,10 @@ def main():
     number_optimization_steps = 10
     particle_size_vector = [num for num in range(15, 27 + 1) if num % 2 != 0][:number_optimization_steps]
     #particle_size_vector = [num for num in range(21, 33 + 1) if num % 2 != 0][:number_optimization_steps]
-    print('\nparticle_size_vector: ', particle_size_vector)
+    print('\tparticle_size_vector: ', particle_size_vector)
     minmass_vector = np.linspace(250, 500, num=number_optimization_steps, endpoint=True,dtype=int)
     #minmass_vector = np.linspace(450, 550, num=number_optimization_steps, endpoint=True,dtype=int)
-    print('\nminmass_vector: ', minmass_vector)
+    print('\tminmass_vector: ', minmass_vector)
 
     fig, ax = plt.subplots(len(minmass_vector),len(particle_size_vector)+1, 
                           figsize=(3*len(particle_size_vector),
@@ -561,7 +561,8 @@ def main():
     import warnings
     for i, mm in enumerate(minmass_vector):
       for j, particle_size in enumerate(particle_size_vector):
-        print("\t", f"i: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}")
+        outmsg = f"\ti: {i}, particle_size: {particle_size}; j: {j}, minmass: {mm}"
+        print(outmsg, "\b" * len(outmsg), sep='', end='',flush=True)
         with warnings.catch_warnings(): # suppress warning for no spots found
           warnings.simplefilter("ignore")
           spots_detected_dataframe = tp.locate(GFP,diameter=particle_size, minmass=mm) 
@@ -571,7 +572,7 @@ def main():
           metric[i,j] = np.sum(df_in_mask['mass']) / len(df_in_mask) # maximizes the mean intensity in all spots
         else:
           metric[i,j] = 0
-
+      
         annotate_spots(rotate_df(df_in_mask,final_tform), transform_and_crop(masked_GFP, final_tform), ax[i,j+1],
                        plot_styles={'s': 6, 'alpha':1, 'linewidths':.6, 'facecolors': 'none', 'edgecolors': 'r' })
         ax[i,j+1].axis('off')
@@ -579,6 +580,7 @@ def main():
         ax[i,j+1].set(title=f'{particle_size};{mm}; {len(df_in_mask)} spots')
 
         del spots_detected_dataframe, df_in_mask
+    print()
 
     metric = metric.astype(int)
 
