@@ -45,28 +45,28 @@ GGTukey<-function(Tukey){
 }
 ```
 
-## R Markdown
+## Data file
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r data file}
 segmentation = read.table('all_nuclei.csv', sep=',', header=T)
-segmentation %<>% mutate(IntensityIntegers = round(log(mass)*10)) %>%
-                  mutate(IntensityIntegers = IntensityIntegers - min(IntensityIntegers))
-segmentation$Genotype = case_when(
-  segmentation$Genotype == 'JM149' ~ 'ELT-2-GFP',
-  segmentation$Genotype == 'JM259' ~ 'ELT-7-KO',
-    
-)
-segmentation$time = 1:nrow(segmentation) %% 2 + 1
-write.table(segmentation, 'datasetDavidKingSept2023.csv', sep=',', row.names = F, quote=F, col.names = T)
+
+segmentation = segmentation %>% mutate(IntensityIntegers = round(mass), time = Rep)
+segmentation %<>% mutate(Genotype = case_when(
+                    Genotype == 'JM149' ~ 'ELT-2-GFP',
+                    Genotype == 'JM259' ~ 'ELT-7-KO'
+                  ))
+
+write.table(segmentation, 'datasetDavidKingOct2023.csv', 
+            sep=',', 
+            row.names = F, 
+            quote=F, 
+            col.names = T)
 ```
 
 
 ```{r filtermunge}
-#segmentation %<>% filter(Worm != '7-8')
+segmentation %<>% filter(Worm != '7-8')
 segmentation %<>% mutate(Rep = as.factor(Rep), Worm = factor(Worm,levels=1:11), RNAi=factor(RNAi, levels=rev(sort(unique(segmentation$RNAi)))))
 
 worm_summary= segmentation %>% group_by(Rep,RNAi,Genotype) %>% summarize(n=n())
@@ -78,7 +78,7 @@ segmentation %>% group_by(Rep,Worm,RNAi,Genotype) %>% summarize(n=n()) %>% ungro
 ```
 
 ```{r }
-ggplot(segmentation, aes(x=IntensityIntegers, fill=RNAi)) + geom_density(alpha=.5) + facet_wrap(~Genotype+factor(time)) + ggtitle("Intensity integers are round(log(mass)*10)-min", subtitle = "Evenly divided into timepoints 1 and 2")
+ggplot(segmentation, aes(x=mass, fill=RNAi)) + geom_density(alpha=.5) + facet_wrap(~Genotype+factor(time)) + ggtitle("Intensity integers are round(mass)", subtitle = "reps formed the timepoints") + xlim(c(0,7500))
 
 
 ggplot(segmentation , aes(x=Genotype, y = log(mass), color=factor(time))) + geom_boxplot() + facet_wrap(~RNAi) + ggtitle("Brightness of nuclei (mass)")
