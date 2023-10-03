@@ -11,6 +11,38 @@ knitr::opts_chunk$set(echo = TRUE)
 library(magrittr)
 library(dplyr)
 library(ggplot2)
+library(tidyverse)
+
+GGTukey<-function(Tukey){
+ 
+  B<-as.data.frame(Tukey[1])
+  colnames(B)[2:3]<-c("min",
+                      "max")
+  C<-data.frame(id=row.names(B),
+                min=B$min,
+                max=B$max)
+  D<-C%>%
+    ggplot(aes(id))+
+    geom_errorbar(aes(ymin=min,
+                     ymax=max),
+                 width = 0.2)+
+    geom_hline(yintercept=0,
+               color="red")+
+    labs(x=NULL)+
+    coord_flip()+
+    theme(  #text=element_text(family="TimesNewRoman"),
+            title=element_text(color="black",size=15),
+            axis.text = element_text(color="black",size=10),
+            axis.title = element_text(color="black",size=10),
+            panel.grid=element_line(color="grey75"),
+            axis.line=element_blank(),
+            plot.background=element_rect(fill="white",color="white"),
+            panel.background=element_rect(fill="white"),
+            panel.border = element_rect(colour = "black", fill = NA,size=0.59),
+            legend.key= element_rect(color="white",fill="white")
+          )
+  return(D)
+}
 ```
 
 ## R Markdown
@@ -20,16 +52,58 @@ This is an R Markdown document. Markdown is a simple formatting syntax for autho
 When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
 
 ```{r data file}
-segmentation = read.table('rotated_all_segmentation_results.csv', sep=',', header=T)
+segmentation = read.table('all_nuclei.csv', sep=',', header=T)
+segmentation %<>% mutate(IntensityIntegers = round(log(mass)*10)) %>%
+                  mutate(IntensityIntegers = IntensityIntegers - min(IntensityIntegers))
+segmentation$Genotype = case_when(
+  segmentation$Genotype == 'JM149' ~ 'ELT-2-GFP',
+  segmentation$Genotype == 'JM259' ~ 'ELT-7-KO',
+    
+)
+segmentation$time = 1:nrow(segmentation) %% 2 + 1
+write.table(segmentation, 'datasetDavidKingSept2023.csv', sep=',', row.names = F, quote=F, col.names = T)
 ```
 
-## Including Plots
-
-You can also embed plots, for example:
 
 ```{r filtermunge}
-segmentation %<>% filter(Worm != '7-8')
+#segmentation %<>% filter(Worm != '7-8')
 segmentation %<>% mutate(Rep = as.factor(Rep), Worm = factor(Worm,levels=1:11), RNAi=factor(RNAi, levels=rev(sort(unique(segmentation$RNAi)))))
+
+worm_summary= segmentation %>% group_by(Rep,RNAi,Genotype) %>% summarize(n=n())
+worm_summary
+```
+
+```{r worm summary}
+segmentation %>% group_by(Rep,Worm,RNAi,Genotype) %>% summarize(n=n()) %>% ungroup() %>% group_by(RNAi,Genotype) %>% summarise(ave_nuclei = mean(n), sd_nuclei=sd(n))
+```
+
+```{r }
+ggplot(segmentation, aes(x=IntensityIntegers, fill=RNAi)) + geom_density(alpha=.5) + facet_wrap(~Genotype+factor(time)) + ggtitle("Intensity integers are round(log(mass)*10)-min", subtitle = "Evenly divided into timepoints 1 and 2")
+
+
+ggplot(segmentation , aes(x=Genotype, y = log(mass), color=factor(time))) + geom_boxplot() + facet_wrap(~RNAi) + ggtitle("Brightness of nuclei (mass)")
+
+ggplot(segmentation , aes(x=Genotype, y = IntensityIntegers, color=factor(time))) + geom_boxplot() + facet_wrap(~RNAi) + ggtitle("Size of detected nucleus")
+```
+
+```{r boxplots}
+segmentation %<>% mutate(Genotype_RNAi = paste(Genotype,RNAi,sep="."))
+segmentation %>% group_by(Genotype_RNAi) %>% 
+  summarize(median_log_intensity = median(log(mass))) %>%  
+  arrange(median_log_intensity) %>% pull(Genotype_RNAi) -> order_of_Genotype_RNAi 
+
+order_of_Genotype_RNAi = c("ELT-2-GFP.L4440_RNAi","ELT-2-GFP.ELT-2_RNAi","ELT-7-KO.ELT-2_RNAi","ELT-7-KO.L4440_RNAi")
+segmentation %<>% mutate(Genotype_RNAi = factor(Genotype_RNAi, levels=order_of_Genotype_RNAi))
+table(segmentation$experiment_description)
+ggplot(segmentation, aes(x=Genotype_RNAi, y=log(mass))) + geom_boxplot() + ggtitle("elt-2 gene autoregulation: ",subtitle = "elt-2 autorepression, elt-7 activation") + theme_classic()
+ggsave("elt2_autorepression.pdf")
+
+segmentation.aov = aov(log(segmentation$mass) ~ segmentation$Genotype_RNAi)
+summary(segmentation.aov)
+tk = TukeyHSD(segmentation.aov, conf.level = .95)
+tk
+GGTukey(tk)
+
 ```
 
 ```{r plots}
