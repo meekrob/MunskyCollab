@@ -88,8 +88,8 @@ def main():
   else:
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_1'
     #path_dir = '/Volumes/onishlab_shared/PROJECTS/32_David_Erin_Munskylab/Izabella_data/Keyence_data/201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_4'
-    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
-    #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
+    #path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/L4440_RNAi/L1/JM149_L1_L4440_worm_9'
+    path_dir = '/Users/david/work/MunskyColab/data/201002_JM149_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM149_L1_ELT-2_worm_1'
     print("no argument provided.\nDefaulting to", path_dir)
 
   if not os.path.exists(path_dir):
@@ -303,13 +303,16 @@ def main():
           final_mask[coords[:, 0], coords[:, 1]] = 1
 
   if final_mask.max() == 0:
-    raise "everything masked"
-  
-
-  # Mask by image
-  segmented_image = np.multiply(final_mask,max_Brightfield)
-  masked_GFP = np.multiply(final_mask,max_GFP)
+    #raise "everything masked"
+    #final_mask = None
+    segmented_image = max_Brightfield.copy()
+    masked_GFP = max_GFP.copy()
+  else:
+    # Mask by image
+    segmented_image = np.multiply(final_mask,max_Brightfield)
+    masked_GFP = np.multiply(final_mask,max_GFP)
   datasave['final_mask'] = final_mask
+
   datasave['segmented_image'] = segmented_image
   datasave['masked_GFP'] = masked_GFP
 
@@ -329,139 +332,143 @@ def main():
   pc = np.array(segmented_image.T.shape)[:2]/2
 
   """## Linear regression"""
-  minmax = lambda x: (min(x), max(x))
-  x,y = segmented_image.T.nonzero()
-  # horizontal line through worm
-  A = np.vstack([x, np.ones(len(x))]).T
-  horiz_fit = np.linalg.lstsq(A, y, rcond=None)
-  horiz_slope, horiz_intercept = horiz_fit[0]
+  DO_REGRESSION_ON_MASK = False
+  final_matrix = np.identity(len(segmented_image.T.shape)+1)
+  final_tform  = transform.EuclideanTransform(final_matrix)
+  if DO_REGRESSION_ON_MASK:
+    minmax = lambda x: (min(x), max(x))
+    x,y = segmented_image.T.nonzero() # if the whole image is masked due to background, this will be empty
+    # horizontal line through worm
+    A = np.vstack([x, np.ones(len(x))]).T
+    horiz_fit = np.linalg.lstsq(A, y, rcond=None)
+    horiz_slope, horiz_intercept = horiz_fit[0]
 
-  # vertical line through worm
-  A = np.vstack([y, np.ones(len(y))]).T
-  vertical_fit = np.linalg.lstsq(A, x, rcond=None)
-  vertical_slope, vertical_intercept = vertical_fit[0]
+    # vertical line through worm
+    A = np.vstack([y, np.ones(len(y))]).T
+    vertical_fit = np.linalg.lstsq(A, x, rcond=None)
+    vertical_slope, vertical_intercept = vertical_fit[0]
 
-  horiz_line = lambda a: a*horiz_slope + horiz_intercept
-  vertical_line = lambda a: a*vertical_slope + vertical_intercept
+    horiz_line = lambda a: a*horiz_slope + horiz_intercept
+    vertical_line = lambda a: a*vertical_slope + vertical_intercept
 
-  horiz_line_inv = lambda a: (a-horiz_intercept)/horiz_slope
-  vertical_line_inv = lambda a: (a-vertical_intercept)/vertical_slope
+    horiz_line_inv = lambda a: (a-horiz_intercept)/horiz_slope
+    vertical_line_inv = lambda a: (a-vertical_intercept)/vertical_slope
 
-  m,b = vertical_fit[0]
-  inverse_m = 1 / m # why isn't it -1 / m?
-  horiz_angle_correction = math.atan(horiz_slope)
-  inverse_vertical_angle_correction = math.atan(inverse_m)
+    m,b = vertical_fit[0]
+    inverse_m = 1 / m # why isn't it -1 / m?
+    horiz_angle_correction = math.atan(horiz_slope)
+    inverse_vertical_angle_correction = math.atan(inverse_m)
 
-  img_height, img_width = segmented_image.shape
+    img_height, img_width = segmented_image.shape
 
-  xmin = 0
-  xmax = img_width
-  ymin = 0
-  ymax = img_height
+    xmin = 0
+    xmax = img_width
+    ymin = 0
+    ymax = img_height
 
-  # horiz
-  horiz_xbounds, horiz_ybounds = isect_line_box(horiz_fit[0], 0, 0, img_width, img_height)
-  horiz_xseries = np.linspace(horiz_xbounds[0], horiz_xbounds[1],3)
-  horiz_yseries = np.linspace(horiz_ybounds[0], horiz_ybounds[1],3)
+    # horiz
+    horiz_xbounds, horiz_ybounds = isect_line_box(horiz_fit[0], 0, 0, img_width, img_height)
+    horiz_xseries = np.linspace(horiz_xbounds[0], horiz_xbounds[1],3)
+    horiz_yseries = np.linspace(horiz_ybounds[0], horiz_ybounds[1],3)
 
-  # vert
-  vertical_ybounds, vertical_xbounds = isect_line_box(vertical_fit[0], 0, 0, img_height, img_width)
-  vertical_xseries = np.linspace(vertical_xbounds[0], vertical_xbounds[1],3)
-  vertical_yseries = np.linspace(vertical_ybounds[0], vertical_ybounds[1],3)
+    # vert
+    vertical_ybounds, vertical_xbounds = isect_line_box(vertical_fit[0], 0, 0, img_height, img_width)
+    vertical_xseries = np.linspace(vertical_xbounds[0], vertical_xbounds[1],3)
+    vertical_yseries = np.linspace(vertical_ybounds[0], vertical_ybounds[1],3)
 
-  # center of fitted line (horizontal)
-  cf_horiz = (horiz_xseries[1],horiz_yseries[1])
+    # center of fitted line (horizontal)
+    cf_horiz = (horiz_xseries[1],horiz_yseries[1])
 
-  # center of fitted line (vertical)
-  cf_vertical = (vertical_xseries[1],vertical_yseries[1])
+    # center of fitted line (vertical)
+    cf_vertical = (vertical_xseries[1],vertical_yseries[1])
 
-  # plot 4 panels, top row horiz, vertical line fits
-  fig, ax  = plt.subplots(3,2, figsize=(15,10))
-  plotname = f"{full_name_prefix}_rotation"
-  fig.suptitle(f"{full_name_prefix} rotation/translation")
-  ax[0,0].imshow(segmented_image,cmap=color_map)
-  ax[0,0].scatter(cf_horiz[0], cf_horiz[1],  s=10, edgecolors='b')
-  ax[0,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[0,0].plot(horiz_xseries, horiz_yseries,'r')
-  ax[0,0].set(title='horizontal line fit')
+    # plot 4 panels, top row horiz, vertical line fits
+    fig, ax  = plt.subplots(3,2, figsize=(15,10))
+    plotname = f"{full_name_prefix}_rotation"
+    fig.suptitle(f"{full_name_prefix} rotation/translation")
+    ax[0,0].imshow(segmented_image,cmap=color_map)
+    ax[0,0].scatter(cf_horiz[0], cf_horiz[1],  s=10, edgecolors='b')
+    ax[0,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[0,0].plot(horiz_xseries, horiz_yseries,'r')
+    ax[0,0].set(title='horizontal line fit')
 
-  # vertical
-  ax[0,1].imshow(segmented_image,cmap=color_map)
-  ax[0,1].scatter(cf_vertical[0], cf_vertical[1], s=10, edgecolors='b')
-  ax[0,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[0,1].plot(vertical_xseries, vertical_yseries,'r')
-  ax[0,1].set(title='vertical line fit')
+    # vertical
+    ax[0,1].imshow(segmented_image,cmap=color_map)
+    ax[0,1].scatter(cf_vertical[0], cf_vertical[1], s=10, edgecolors='b')
+    ax[0,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[0,1].plot(vertical_xseries, vertical_yseries,'r')
+    ax[0,1].set(title='vertical line fit')
 
-  # shift the whole image from the fitted line midpoint to the origin
-  cf_horiz_shift = transform.EuclideanTransform(translation=[cf_horiz[0],cf_horiz[1]])
-  cf_vertical_shift = transform.EuclideanTransform(translation=[-cf_vertical[0],-cf_vertical[1]])
+    # shift the whole image from the fitted line midpoint to the origin
+    cf_horiz_shift = transform.EuclideanTransform(translation=[cf_horiz[0],cf_horiz[1]])
+    cf_vertical_shift = transform.EuclideanTransform(translation=[-cf_vertical[0],-cf_vertical[1]])
 
-  # shift the origin back to the plot center
-  shift_to_plot_center = transform.EuclideanTransform(translation= [plot_center[0],plot_center[1]])
+    # shift the origin back to the plot center
+    shift_to_plot_center = transform.EuclideanTransform(translation= [plot_center[0],plot_center[1]])
 
-  ## FLIP or nah??????
-  flip = np.identity(3)
-  if FLIP_X: flip[0,0] = -1
+    ## FLIP or nah??????
+    flip = np.identity(3)
+    if FLIP_X: flip[0,0] = -1
 
-  # horizontal angle
-  angleH = math.atan(horiz_slope)
-  rotation = transform.EuclideanTransform(rotation=angleH)
-  matrix_h = cf_horiz_shift.params @ rotation.params @ flip @ np.linalg.inv(shift_to_plot_center.params)
-  tform_h = transform.EuclideanTransform(matrix_h)
-  tf_img_h = transform.warp(segmented_image, tform_h)
+    # horizontal angle
+    angleH = math.atan(horiz_slope)
+    rotation = transform.EuclideanTransform(rotation=angleH)
+    matrix_h = cf_horiz_shift.params @ rotation.params @ flip @ np.linalg.inv(shift_to_plot_center.params)
+    tform_h = transform.EuclideanTransform(matrix_h)
+    tf_img_h = transform.warp(segmented_image, tform_h)
 
-  # vertical
-  angleV = inverse_vertical_angle_correction
+    # vertical
+    angleV = inverse_vertical_angle_correction
 
-  rotation = transform.EuclideanTransform(rotation=angleV)
-  matrix_v =  shift_to_plot_center.params @ flip @ np.linalg.inv(rotation.params)  @ cf_vertical_shift.params
-  tform_v = transform.EuclideanTransform(matrix_v)
-  tf_img_v = transform.warp(segmented_image, tform_v.inverse)
+    rotation = transform.EuclideanTransform(rotation=angleV)
+    matrix_v =  shift_to_plot_center.params @ flip @ np.linalg.inv(rotation.params)  @ cf_vertical_shift.params
+    tform_v = transform.EuclideanTransform(matrix_v)
+    tf_img_v = transform.warp(segmented_image, tform_v.inverse)
 
-  ax[1,0].imshow(tf_img_h, cmap=color_map)
-  ax[1,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[1,0].set(title='rotate %d degrees' % math.degrees(angleH))
-  ax[1,1].imshow(tf_img_v, cmap=color_map)
-  ax[1,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[1,1].set(title='rotate %d degrees' % math.degrees(angleV))
+    ax[1,0].imshow(tf_img_h, cmap=color_map)
+    ax[1,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[1,0].set(title='rotate %d degrees' % math.degrees(angleH))
+    ax[1,1].imshow(tf_img_v, cmap=color_map)
+    ax[1,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[1,1].set(title='rotate %d degrees' % math.degrees(angleV))
 
-  # choose the transform coming from the better fit
-  if horiz_fit[1] < vertical_fit[1]:
-    matrix = matrix_h
-    tform = tform_h
-  else:
-    matrix = np.linalg.inv(matrix_v)
-    tform = tform_v.inverse
+    # choose the transform coming from the better fit
+    if horiz_fit[1] < vertical_fit[1]:
+      matrix = matrix_h
+      tform = tform_h
+    else:
+      matrix = np.linalg.inv(matrix_v)
+      tform = tform_v.inverse
 
-  # rotate onto a much larger canvas
-  rotated_image = transform.warp(segmented_image, tform, output_shape = (img_height * 2, img_width * 2))
-  ax[2,0].imshow(rotated_image, cmap=color_map)
-  ax[2,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[2,0].set(title='Chosen rotation')
+    # rotate onto a much larger canvas
+    rotated_image = transform.warp(segmented_image, tform, output_shape = (img_height * 2, img_width * 2))
+    ax[2,0].imshow(rotated_image, cmap=color_map)
+    ax[2,0].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[2,0].set(title='Chosen rotation')
 
-  x,y = rotated_image.nonzero()
-  ax[2,0].axvline(x = min(y), color = 'w', linestyle = '-')
-  ax[2,0].axhline(y = min(x), color = 'w', linestyle = '-')
+    x,y = rotated_image.nonzero()
+    ax[2,0].axvline(x = min(y), color = 'w', linestyle = '-')
+    ax[2,0].axhline(y = min(x), color = 'w', linestyle = '-')
 
-  # prepare to crop by shifting bounding box to origin (it will also be necessary to shift the spot coordinates)
-  shift_bounding_box_to_origin = transform.EuclideanTransform(translation = (min(y), min(x)))
+    # prepare to crop by shifting bounding box to origin (it will also be necessary to shift the spot coordinates)
+    shift_bounding_box_to_origin = transform.EuclideanTransform(translation = (min(y), min(x)))
 
-  final_matrix = matrix @ shift_bounding_box_to_origin.params
-  final_tform = transform.EuclideanTransform(final_matrix)
-  datasave['final_matrix'] = final_matrix
-  datasave['final_tform'] = final_tform
+    final_matrix = matrix @ shift_bounding_box_to_origin.params
+    final_tform = transform.EuclideanTransform(final_matrix)
+    datasave['final_matrix'] = final_matrix
+    datasave['final_tform'] = final_tform
 
-  rotated_image = transform.warp(segmented_image, final_tform, output_shape = (img_height * 2, img_width * 2))
+    rotated_image = transform.warp(segmented_image, final_tform, output_shape = (img_height * 2, img_width * 2))
 
-  x,y = rotated_image.nonzero()
-  cropped_image = rotated_image[:max(x),:max(y)]
-  datasave['cropped_image'] = cropped_image
-  ax[2,1].imshow(cropped_image, cmap=color_map)
-  ax[2,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
-  ax[2,1].set(title='rotated and cropped')
-  ax = ax[2,1]; ax.axis('tight');# ax.axis('off'); ax.grid(False)
-  plt.savefig(plotname + '.png')
-  plt.close()
+    x,y = rotated_image.nonzero()
+    cropped_image = rotated_image[:max(x),:max(y)]
+    datasave['cropped_image'] = cropped_image
+    ax[2,1].imshow(cropped_image, cmap=color_map)
+    ax[2,1].scatter(pc[0], pc[1],  s=10, edgecolors='yellow', c='yellow')
+    ax[2,1].set(title='rotated and cropped')
+    ax = ax[2,1]; ax.axis('tight');# ax.axis('off'); ax.grid(False)
+    plt.savefig(plotname + '.png')
+    plt.close()
 
   """# Nuclei segmentation using trackpy"""
   print("Nuclei segmentation using trackpy")
@@ -575,6 +582,37 @@ def main():
   # rotating the image with the transform matrix based on the vertical fit
   df_mx = df_in_mask.loc[:,('x','y')]
   df_mx['1'] = 1
+
+  DO_REGRESSION_ON_SPOTS = True
+  if DO_REGRESSION_ON_SPOTS:
+    spot_regression = numpy_regression(df_mx.loc[:,('x')], df_mx.loc[:,('y')])
+    spot_regression_v = numpy_regression(df_mx.loc[:,('y')],  df_mx.loc[:,('x')])
+    print(spot_regression)
+    spot_m,spot_b = spot_regression[0]
+    spot_m_v,spot_b_v = spot_regression_v[0]
+    spot_SS = spot_regression[1]
+    spot_SS_v = spot_regression_v[1]
+    spot_inverse_m = 1 / spot_m_v # why isn't it -1 / m?
+    spot_horiz_angle_correction = math.atan(spot_m)
+    spot_inverse_vertical_angle_correction = math.atan(spot_inverse_m)
+    selected_rotation = spot_horiz_angle_correction
+    if spot_SS_v < spot_SS: selected_rotation = spot_inverse_vertical_angle_correction
+    midpoint = lambda x: x.min() + ((x.max()-x.min())/2)
+    cf_spot = (midpoint(df_mx['x']),midpoint(df_mx['y']))
+    shift_to_cf_spot = transform.EuclideanTransform(translation= [cf_spot[0],cf_spot[1]])
+
+    ## FLIP or nah??????
+    flip = np.identity(3)
+    if FLIP_X: flip[0,0] = -1
+
+    rotation_et = transform.EuclideanTransform(rotation=selected_rotation)
+    matrix_spot = shift_to_cf_spot.params @ rotation_et.params @ flip @ np.linalg.inv(shift_to_cf_spot.params)
+    tform_spot = transform.EuclideanTransform(matrix_spot)
+    tf_img_spot = transform.warp(segmented_image, tform_spot) 
+    
+    # used downstream
+    final_matrix = matrix_spot
+    final_tform = tform_spot
 
   rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
   df_in_mask_rotated = df_in_mask.copy()
@@ -754,12 +792,14 @@ def rotate_df(df, final_matrix):
 
 # from Luis: select only the spots in the mask using their coordinates (df)
 def spots_in_mask(df,masks):
+    if masks.max() == 0:
+      return df
     # extracting the contours in the image
     coords = np.array([df.y, df.x]).T # These are the points detected by trackpy
     coords_int = np.round(coords).astype(int)  # or np.floor, depends
     values_at_coords = masks[tuple(coords_int.T)] # If 1 the value is in the mask
     df['In Mask']=values_at_coords # Check if pts are on/in polygon mask
-    condition = df['In Mask'] ==1
+    condition = df['In Mask'] == 1
     selected_rows = df[condition]
     
     return selected_rows.drop(columns=['In Mask'])
@@ -767,6 +807,8 @@ def spots_in_mask(df,masks):
 def transform_and_crop(image, tform):
   tformed = transform.warp(image, tform)
   x,y = tformed.nonzero()
+  if len(x) == 0 or len(y) == 0:
+    return tformed
   return tformed[:max(x),:max(y)]
 
 def numpy_regression(x,y, rcond=None):
