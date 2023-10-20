@@ -557,7 +557,7 @@ def main():
 
     metric = metric.astype(int)
 
-    # selecting indces that maximize metric
+    # selecting indices that maximize metric
     selected_minmass_index, selected_particle_size_index = np.unravel_index(metric.argmax(), metric.shape)
     selected_minmass = minmass_vector[selected_minmass_index]
     selected_particle_size = particle_size_vector[selected_particle_size_index]
@@ -613,12 +613,20 @@ def main():
     # used downstream
     final_matrix = matrix_spot
     final_tform = tform_spot
+    
 
   rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
   df_in_mask_rotated = df_in_mask.copy()
   df_in_mask_rotated['x'] = rotated.iloc[:,0]
   df_in_mask_rotated['y'] = rotated.iloc[:,1]
-
+  ymin = df_in_mask_rotated.loc[:,"y"].min()
+  ymax = df_in_mask_rotated.loc[:,"y"].max()
+  yrange = (ymax-ymin)*6
+  ymin = math.floor((ymax+ymin)/2 - yrange/2)
+  ymax = math.ceil(ymin + yrange)
+  segmented_image = transform_cropstrip_untransform(segmented_image, final_tform, (ymin, ymax))
+  masked_GFP = transform_cropstrip_untransform(masked_GFP, final_tform, (ymin, ymax))
+  df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin
   # write the selected spot find
   plotname = f"{full_name_prefix}_spots_detected"
   print("\tPlotting", plotname)
@@ -627,7 +635,7 @@ def main():
   fig.suptitle(f"{full_name_prefix} spots detected")
 
   # rotating the image with the transform matrix based on the better linear fit
-  df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
+  #df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
   datasave['dataframe'] = df_in_mask_rotated
 
   fig, ax = plt.subplots(4,1,figsize=(15,6),dpi = 600)
@@ -636,6 +644,7 @@ def main():
   plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
   ax[0].imshow(transform_and_crop(segmented_image,final_tform), cmap=color_map)
   annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
+  plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
   annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles)
 
   datasave['rotated_cropped_segmented_image'] = transform_and_crop(segmented_image, final_tform)
@@ -658,7 +667,7 @@ def main():
   plt.savefig(plotname + '.png')
   plt.close()
 
-  # save a file
+  # save dataframe as csv
   spots_detected_dataframe = df_in_mask_rotated
   spots_detected_dataframe['Worm'] = wormnumber
   spots_detected_dataframe['Rep'] = repnum
@@ -803,13 +812,31 @@ def spots_in_mask(df,masks):
     selected_rows = df[condition]
     
     return selected_rows.drop(columns=['In Mask'])
+def make_strip_mask(image, tform, strip):
+  tformed = transform.warp(image, tform)
+  mask = np.ones_like(tformed)
 
+def transform_cropstrip_untransform(image, tform, strip):
+  tformed = transform.warp(image, tform)
+  cropmin,cropmax = strip
+  tformed[:cropmin,] = 0
+  tformed[cropmax:,:] = 0
+  
+  inverse = transform.EuclideanTransform(np.linalg.inv(tform.params))
+  untformed = transform.warp(tformed, inverse)
+  return untformed
+  
 def transform_and_crop(image, tform):
+  # auto-crop to the zeroed out coordinates (from mask) if they exist
   tformed = transform.warp(image, tform)
   x,y = tformed.nonzero()
+
   if len(x) == 0 or len(y) == 0:
     return tformed
-  return tformed[:max(x),:max(y)]
+  
+  #shift_to_top = transform.EuclideanTransform(translation=(0,cropmin))
+  #tformed = transform.warp(tformed, shift_to_top)
+  return tformed[min(x):max(x),min(y):max(y)]
 
 def numpy_regression(x,y, rcond=None):
   A = np.vstack([x, np.ones(len(x))]).T
