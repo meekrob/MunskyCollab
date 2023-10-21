@@ -49,6 +49,29 @@ import json
 
 from optparse import OptionParser
 
+def parse_provenance_from_path(path_dir):
+  print("Parsing genotype, RNAi, stage, worm from path.")
+  longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
+  named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
+  genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
+  print(f"\t{genotype=}")
+  print(f"\t{repnum=}")
+  print(f"\t{RNAi=}")
+  print(f"\t{stage=}")
+  print(f"\t{wormnumber=}")
+  return genotype, repnum, RNAi, stage, wormnumber
+
+def make_fullname_prefix(genotype, repnum, RNAi, stage, wormnumber):
+  return f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
+
+def searchpathlist(pathlist, target):
+  # search path list for target, return the first path that contains it or None
+  for path in pathlist:
+    if os.path.exists( path ) and os.path.exists( os.path.join(path, target ) ):
+      return path
+
+  return None
+
 def main():
   USAGE = "[prog] image-set-path"
 
@@ -98,29 +121,32 @@ def main():
 
   # read manual settings from a file in the same directory as the images,
   # if they exist
+  json_search_path = [path_dir, '.', script_dir]
+
   if options.json_path:
     json_filename = options.json_path
-    if not check_pathdir(json_filename): # might be a path relative to script_dir
-      alt_json_filename = os.path.join(script_dir, json_filename)
-      if not check_pathdir(alt_json_filename):
-        print("Error: supplied json_path not found:\n", file=sys.stderr)
-        print(f"NOT FOUND: {json_filename}", file=sys.stderr)
-        print(f"NOT FOUND: {alt_json_filename}", file=sys.stderr)
-        sys.exit(1)
-      else:
-        json_filename = alt_json_filename
+    json_file_found = searchpathlist(json_search_path, json_filename)
+    if json_file_found is not None: # file already exists
+      json_filename = pathlib.Path( os.path.join(json_file_found, json_filename)).absolute()
+      print(f"Using {json_filename} to read and update settings.")
+
+    else:  # file not found, make sure specified containing directories exist
+      pathlib.Path(os.path.dirname(json_filename)).mkdir(parents=True, exist_ok=True)
+      print(f"creating {json_filename} to store settings.")
+
   else:
       # get worm info from path and filename
     try:
-      print("Parsing genotype, RNAi, stage, worm from path.")
-      longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
-      named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
-      genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
-      print(f"\t{genotype=}")
-      print(f"\t{repnum=}")
-      print(f"\t{RNAi=}")
-      print(f"\t{stage=}")
-      print(f"\t{wormnumber=}")
+      # print("Parsing genotype, RNAi, stage, worm from path.")
+      # longname =  os.path.sep.join(path_dir.split(os.path.sep)[-4:])
+      # named_pat = "\d+_(?P<genotype>\S+)_elt-2_Promoter_Rep_(?P<repnum>\d)/(?P<RNAi>\S+)_RNAi/(?P<stage>\S+)/.+_worm_(?P<wormnum>\S+)$"
+      # genotype, repnum, RNAi, stage, wormnumber = re.match(named_pat, longname).groups()
+      genotype, repnum, RNAi, stage, wormnumber = parse_provenance_from_path(path_dir)
+      # print(f"\t{genotype=}")
+      # print(f"\t{repnum=}")
+      # print(f"\t{RNAi=}")
+      # print(f"\t{stage=}")
+      # print(f"\t{wormnumber=}")
       
     except:
       print("Error parsing: `%s`" % longname, file=sys.stderr)
@@ -128,7 +154,7 @@ def main():
       print("Example: 201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1", file=sys.stderr)
       raise
 
-    full_name_prefix = f"{genotype}_{RNAi}_{stage}_Rep{repnum}_Worm{wormnumber}"
+    full_name_prefix = make_fullname_prefix(genotype, repnum, RNAi, stage, wormnumber)
     print(f"{full_name_prefix=}")
     json_filename = f"{full_name_prefix}_manual_params.json"
 
@@ -163,6 +189,11 @@ def main():
     else:
       print(f"User argument -x,--get-exp-from-json requires data stored in a json file {options.json_path=} but it doesn't exist.")
       sys.exit(1)
+  elif options.json_path and not options.get_exp_from_json:
+      genotype, repnum, RNAi, stage, wormnumber = parse_provenance_from_path(path_dir)
+      full_name_prefix = make_fullname_prefix(genotype, repnum, RNAi, stage, wormnumber)
+      
+  
   if options.recalculate_mask:
     USE_CACHED_MASK = False
 
@@ -621,11 +652,18 @@ def main():
   df_in_mask_rotated['y'] = rotated.iloc[:,1]
   ymin = df_in_mask_rotated.loc[:,"y"].min()
   ymax = df_in_mask_rotated.loc[:,"y"].max()
-  yrange = (ymax-ymin)*6
-  ymin = math.floor((ymax+ymin)/2 - yrange/2)
-  ymax = math.ceil(ymin + yrange)
-  segmented_image = transform_cropstrip_untransform(segmented_image, final_tform, (ymin, ymax))
-  masked_GFP = transform_cropstrip_untransform(masked_GFP, final_tform, (ymin, ymax))
+
+  for amount in np.arange(6,0,-.1):
+    new_ymin,new_ymax = widen(ymin,ymax,amount)
+    if new_ymin >= 0 and new_ymax <= segmented_image.shape[0]:
+      ymin = new_ymin
+      ymax = new_ymax
+      print("widened range by", amount)
+      break
+
+
+  segmented_image = transform_cropstrip_untransform(segmented_image, final_tform, (round(ymin), round(ymax)))
+  masked_GFP = transform_cropstrip_untransform(masked_GFP, final_tform, (round(ymin), round(ymax)))
   df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin
   # write the selected spot find
   plotname = f"{full_name_prefix}_spots_detected"
@@ -815,6 +853,13 @@ def spots_in_mask(df,masks):
 def make_strip_mask(image, tform, strip):
   tformed = transform.warp(image, tform)
   mask = np.ones_like(tformed)
+
+def widen(lower, upper, amount):
+  span = (upper - lower) * amount
+  
+  new_lower = math.floor((upper+lower)/2 - span/2)
+  new_upper = math.ceil(lower + span)
+  return (new_lower, new_upper)
 
 def transform_cropstrip_untransform(image, tform, strip):
   tformed = transform.warp(image, tform)
