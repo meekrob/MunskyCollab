@@ -48,6 +48,41 @@ from utils import *
 import json
 
 from optparse import OptionParser
+def PLOT_MASKED_IMAGES(full_name_prefix, segmented_image, masked_GFP, color_map):
+  fig, ax  = plt.subplots(2,1)
+  plotname = f"{full_name_prefix}_masked_images"
+  fig.suptitle(f"{full_name_prefix} masked Brightfield/GFP")
+  ax[0].imshow(segmented_image, cmap=color_map)
+  ax[0].set(title='masked brightfield')
+  ax[1].imshow(masked_GFP, cmap=color_map)
+  ax[1].set(title='masked GFP')
+  plt.savefig(plotname + '.png')
+  plt.close()
+
+def quickplot(*args, axis="on", do_columns = False, grid=False, filename = '', titles = [], save = True, **kwargs):
+  ncols = len(args)
+  nrows = 1
+  if do_columns:
+     nrows = ncols
+     ncols = 1
+
+  fig, ax = plt.subplots(nrows, ncols, **kwargs)
+  if nrows == 1 and ncols == 1:
+    ax = [ax]
+
+  for i, img in enumerate(args):
+    ax[i].imshow(img, cmap = 'Greys_r')
+    # ax[i].axis(axis)
+    # ax[i].grid(grid)
+    if len(titles) > i:
+      ax[i].set(title=titles[i])
+  if save:      
+    plt.savefig(filename)
+    plt.close()
+  else:
+    return ax
+
+
 
 def parse_provenance_from_path(path_dir):
   print("Parsing genotype, RNAi, stage, worm from path.")
@@ -245,6 +280,8 @@ def main():
   plt.savefig(plotname + '.png')
   plt.close()
 
+
+
   #@title Plotting all z-slices
   plotname = f"{full_name_prefix}_z-slices"
   number_z_slices = image_ZYXC.shape[0]
@@ -333,7 +370,7 @@ def main():
           # Set the region in the new mask
           final_mask[coords[:, 0], coords[:, 1]] = 1
 
-  if final_mask.max() == 0:
+  if True: #final_mask.max() == 0:
     #raise "everything masked"
     #final_mask = None
     segmented_image = max_Brightfield.copy()
@@ -347,6 +384,8 @@ def main():
   datasave['segmented_image'] = segmented_image
   datasave['masked_GFP'] = masked_GFP
 
+  quickplot(segmented_image, max_GFP, do_columns = True, titles = ['masked brightfield','masked GFP'], filename="firehose.png")
+  #PLOT_MASKED_IMAGES(full_name_prefix, segmented_image, masked_GFP, color_map)
   fig, ax  = plt.subplots(2,1)
   plotname = f"{full_name_prefix}_masked_images"
   fig.suptitle(f"{full_name_prefix} masked Brightfield/GFP")
@@ -357,6 +396,7 @@ def main():
   plt.savefig(plotname + '.png')
   plt.close()
 
+  
   plot_center = np.array(segmented_image.T.shape)[:2]/2
   shift_to_plot_center = transform.EuclideanTransform(translation=-plot_center)
   cm = center_of_mass(segmented_image.T)
@@ -664,19 +704,19 @@ def main():
 
   segmented_image = transform_cropstrip_untransform(segmented_image, final_tform, (round(ymin), round(ymax)))
   masked_GFP = transform_cropstrip_untransform(masked_GFP, final_tform, (round(ymin), round(ymax)))
-  df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin
+  
   # write the selected spot find
   plotname = f"{full_name_prefix}_spots_detected"
   print("\tPlotting", plotname)
 
-  fig, ax = plt.subplots(1,3, figsize=(15, 5),dpi=1000)
+  fig, ax = plt.subplots(1,5, figsize=(15, 5),dpi=1000)
   fig.suptitle(f"{full_name_prefix} spots detected")
 
   # rotating the image with the transform matrix based on the better linear fit
   #df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
   datasave['dataframe'] = df_in_mask_rotated
 
-  fig, ax = plt.subplots(4,1,figsize=(15,6),dpi = 600)
+  fig, ax = plt.subplots(5,1,figsize=(15,6),dpi = 600)
   fig.suptitle(f"{full_name_prefix} Final rotation and found spots")
   
   plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
@@ -684,6 +724,12 @@ def main():
   annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
   plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
   annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles)
+
+  df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin
+  plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
+  annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[3], plot_styles=plot_styles)
+  plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
+  annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[4], plot_styles=plot_styles)
 
   datasave['rotated_cropped_segmented_image'] = transform_and_crop(segmented_image, final_tform)
   datasave['rotated_cropped_masked_GFP'] = transform_and_crop(masked_GFP, final_tform)
