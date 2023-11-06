@@ -203,7 +203,7 @@ def main():
       # print(f"\t{wormnumber=}")
       
     except:
-      print("Error parsing: `%s`" % longname, file=sys.stderr)
+      print("Error parsing: `%s`" % path_dir, file=sys.stderr)
       print(f"Expected last 4 directories of the path to follow the following pattern: \d+_(\\S+)_elt-2_Promoter_Rep_\\S+", file=sys.stderr)
       print("Example: 201124_JM259_elt-2_Promoter_Rep_1/ELT-2_RNAi/L1/JM259_L1_ELT-2_worm_1", file=sys.stderr)
       raise
@@ -746,7 +746,9 @@ def main():
 
     ## FLIP or nah??????
     flip = np.identity(3)
-    if FLIP_X: flip[0,0] = -1
+    if FLIP_X: 
+      print("FLIPPING X axis\n")
+      flip[0,0] = -1
 
     rotation_et = transform.EuclideanTransform(rotation=selected_rotation)
     matrix_spot = shift_to_cf_spot.params @ rotation_et.params @ flip @ np.linalg.inv(shift_to_cf_spot.params)
