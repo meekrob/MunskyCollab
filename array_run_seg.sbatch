@@ -18,27 +18,28 @@ export TMP=$TMPDIR
 module load anaconda/2022.10
 conda activate segmentation
 # ------------------------------------------------------
-# check argument assigned through sbatch --array
-which_line=$SLURM_ARRAY_TASK_ID
-if [ -z "$which_line" ]
+genotype=$1 # one of JM149/JM259
+Rep=$2 # Rep_1, Rep_2, Rep_3
+RNAi=$3 # L4440 or ELT-2
+Worm=$SLURM_ARRAY_TASK_ID
+
+#sbatch --array=1-3,5-7 array_run_seg.sbatch JM259 Rep_3 ELT-2
+
+# to run a non-numeric worm number (such as 7-8), run individually (without --array) and give 7-8 as the 4th argument
+if [ -z "$Worm" ]
 then
-    echo "no array index argument given" >&2
-    exit 1
+    Worm=$4
 fi
-# ------------------------------------------------------
-# loop through input until reaching the entry specified by the array index
-i=0
-while read fname
-do
-    if [ $i -eq $which_line ]
-    then
-        # --------------------------------------------------
-        # run script
-        cmd="python segmentation_c_elegans_3d.py  $fname"
-        echo $cmd
-        time eval $cmd
-        break # only process the requested line
-    fi
-    i=$((i+1))
-done < <(cat *dirlist.txt | grep -v '^$' )
-# end of script  ------------------------------------------------------
+
+fname="segmentation/${genotype}_elt-2_Promoter_${Rep}/${RNAi}_RNAi/L1/${genotype}_L1_${RNAi}_worm_${Worm}"
+echo "Parsed SLURM_ARRAY_TASK_ID into $fname"
+
+if [ ! -e "$fname" ]
+then
+    echo "$fname does not exist" >&2
+    exit 2
+fi
+
+cmd="python segmentation_c_elegans_3d.py $(readlink -f $fname)"
+echo $cmd
+time eval $cmd

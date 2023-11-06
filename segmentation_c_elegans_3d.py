@@ -59,6 +59,25 @@ def PLOT_MASKED_IMAGES(full_name_prefix, segmented_image, masked_GFP, color_map)
   plt.savefig(plotname + '.png')
   plt.close()
 
+def grayscale(image):
+  # grayValue = 0.07 * image[:,:,2] + 0.72 * image[:,:,1] + 0.21 * image[:,:,0]
+  # gray_img = grayValue.astype(np.uint8)
+  # just take the max of each of RGB
+  return np.max(image[:,:,:])
+
+def apply_rectangle(image, x, y, width, height, pixel_width = 5):
+  pass
+
+
+def getTmpFile():
+  return "tmp.png"
+
+def plot_and_reread(img, **kwargs):
+  tmpfile = getTmpFile()
+  quickplot(img, filename = tmpfile, **kwargs)
+  buf = imread(tmpfile)
+  return buf
+
 def quickplot(*args, axis="on", do_columns = False, grid=False, filename = '', titles = [], save = True, **kwargs):
   ncols = len(args)
   nrows = 1
@@ -192,6 +211,10 @@ def main():
     full_name_prefix = make_fullname_prefix(genotype, repnum, RNAi, stage, wormnumber)
     print(f"{full_name_prefix=}")
     json_filename = f"{full_name_prefix}_manual_params.json"
+    # check search path again once the filename is derived from the path
+    json_file_found = searchpathlist(json_search_path, json_filename)
+    if json_file_found is not None: # file already exists
+      json_filename = os.path.join(json_file_found, json_filename)
 
   # need to make sure this is still valid after we change directories
   json_filename = pathlib.Path(json_filename).absolute()
@@ -201,11 +224,11 @@ def main():
   # read it in if it exists.
   user_params = None
   if os.path.exists(json_filename):
-    print(f"Reading settings from json file: {os.path.basename(json_filename)}")
+    print(f"Reading settings from json file: {json_filename}")
     with open(json_filename, "r") as json_in:
       user_params = json.load(json_in)
   else:
-    print(f"Data and settings will be saved in {os.path.basename(json_filename)}")
+    print(f"Data and settings will be saved in {json_filename}")
 
   if options.get_exp_from_json and not options.json_path:
       print("option -x,--get-exp-from-json requires -j,--json-file to be specified.", file=sys.stderr)
@@ -479,7 +502,9 @@ def main():
 
     ## FLIP or nah??????
     flip = np.identity(3)
-    if FLIP_X: flip[0,0] = -1
+    if FLIP_X: 
+        print("FLIPPING X axis\n")
+        flip[0,0] = -1
 
     # horizontal angle
     angleH = math.atan(horiz_slope)
@@ -654,8 +679,53 @@ def main():
   df_mx = df_in_mask.loc[:,('x','y')]
   df_mx['1'] = 1
 
+  from matplotlib.patches import Rectangle
+  from matplotlib.backends.backend_agg import FigureCanvasAgg
   DO_REGRESSION_ON_SPOTS = True
   if DO_REGRESSION_ON_SPOTS:
+    xbounds = int(df_mx['x'].min()) - 25, int(df_mx['x'].max()) + 25
+    width = xbounds[1] - xbounds[0]
+    ybounds = int(df_mx['y'].min()) - 25, int(df_mx['y'].max()) + 25
+    height = ybounds[1] - ybounds[0]
+
+    # top edge
+    edgetop = ybounds[1] + 1
+    edgebottom = ybounds[1] - 1
+    edgeleft = xbounds[0]
+    edgeright = xbounds[1]
+    segmented_image[ edgebottom:edgetop, edgeleft:edgeright] = segmented_image.max()
+    masked_GFP[ edgebottom:edgetop, edgeleft:edgeright] = masked_GFP.max()
+
+    # bottom edge
+    edgetop = ybounds[0] + 1
+    edgebottom = ybounds[0] - 1
+    edgeleft = xbounds[0]
+    edgeright = xbounds[1]
+    segmented_image[ edgebottom:edgetop, edgeleft:edgeright] = segmented_image.max()
+    masked_GFP[ edgebottom:edgetop, edgeleft:edgeright] = masked_GFP.max()
+
+    # left edge
+    edgetop = ybounds[1]
+    edgebottom = ybounds[0] 
+    edgeleft = xbounds[0] - 1
+    edgeright = xbounds[0] + 1
+    segmented_image[ edgebottom:edgetop, edgeleft:edgeright] = segmented_image.max()
+    masked_GFP[ edgebottom:edgetop, edgeleft:edgeright] = masked_GFP.max()
+
+    # right edge
+    edgetop = ybounds[1]
+    edgebottom = ybounds[0] 
+    edgeleft = xbounds[1] - 1
+    edgeright = xbounds[1] + 1
+    segmented_image[ edgebottom:edgetop, edgeleft:edgeright] = segmented_image.max()
+    masked_GFP[ edgebottom:edgetop, edgeleft:edgeright] = masked_GFP.max()
+
+
+    quickplot(segmented_image, masked_GFP, filename="annotated_no_rotation.png", dpi=500)
+ 
+
+
+
     spot_regression = numpy_regression(df_mx.loc[:,('x')], df_mx.loc[:,('y')])
     spot_regression_v = numpy_regression(df_mx.loc[:,('y')],  df_mx.loc[:,('x')])
     print(spot_regression)
@@ -680,18 +750,32 @@ def main():
     matrix_spot = shift_to_cf_spot.params @ rotation_et.params @ flip @ np.linalg.inv(shift_to_cf_spot.params)
     tform_spot = transform.EuclideanTransform(matrix_spot)
     tf_img_spot = transform.warp(segmented_image, tform_spot) 
+    tf_gfp_spot = transform.warp(masked_GFP, tform_spot) 
     
+
     # used downstream
     final_matrix = matrix_spot
     final_tform = tform_spot
+  
     
 
   rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
   df_in_mask_rotated = df_in_mask.copy()
   df_in_mask_rotated['x'] = rotated.iloc[:,0]
   df_in_mask_rotated['y'] = rotated.iloc[:,1]
+
+  AX = quickplot(tf_img_spot, tf_gfp_spot, tf_gfp_spot, save=False, dpi=500)
+  plot_styles={'s': 30, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
+  annotate_spots(df_in_mask_rotated, tf_gfp_spot, AX[2], plot_styles=plot_styles)
+  plt.savefig("annotated_rotated.png")
+  plt.close()
+
+  # crop to an area around the rotated points
   ymin = df_in_mask_rotated.loc[:,"y"].min()
   ymax = df_in_mask_rotated.loc[:,"y"].max()
+
+  xmin = df_in_mask_rotated.loc[:,"x"].min()
+  xmax = df_in_mask_rotated.loc[:,"x"].max()
 
   for amount in np.arange(6,0,-.1):
     new_ymin,new_ymax = widen(ymin,ymax,amount)
@@ -709,8 +793,8 @@ def main():
   plotname = f"{full_name_prefix}_spots_detected"
   print("\tPlotting", plotname)
 
-  fig, ax = plt.subplots(1,5, figsize=(15, 5),dpi=1000)
-  fig.suptitle(f"{full_name_prefix} spots detected")
+  # fig, ax = plt.subplots(1,5, figsize=(15, 5),dpi=1000)
+  # fig.suptitle(f"{full_name_prefix} spots detected")
 
   # rotating the image with the transform matrix based on the better linear fit
   #df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
@@ -725,7 +809,12 @@ def main():
   plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
   annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles)
 
-  df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin
+# blank space caused in x by the rotation:
+  segmented_image_rotated = transform.warp(segmented_image, final_tform) 
+  ylimits,xlimits = segmented_image_rotated.nonzero()
+
+  df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin 
+  df_in_mask_rotated['x'] = df_in_mask_rotated['x'] - min(xlimits)
   plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
   annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[3], plot_styles=plot_styles)
   plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
