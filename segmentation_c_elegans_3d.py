@@ -291,7 +291,8 @@ def main():
   #@title Plotting max projections
   plotname = f"{full_name_prefix}_max_projections"
   color_map = 'Greys_r'
-  fig, ax = plt.subplots(1,2, figsize=(10, 3))
+  fig, ax = plt.subplots(1,2, figsize=(7, 3), sharey=True)
+  
   fig.suptitle(f"{full_name_prefix} max. projections")
   # Plotting the heatmap of a section in the image - MISPLACED LABEL? - DK
   # print("Plotting the heatmap of a section in the image")
@@ -300,6 +301,7 @@ def main():
   ax[0].set(title='max_Brightfield'); ax[0].axis('on');ax[0].grid(False)
   ax[1].set(title='max_GFP'); ax[1].axis('on');ax[1].grid(False)
   print("Plotting max projections:", plotname + '.png')
+ 
   plt.savefig(plotname + '.png')
   plt.close()
 
@@ -759,8 +761,12 @@ def main():
   
     
 
-  rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
+  
   df_in_mask_rotated = df_in_mask.copy()
+  df_in_mask_rotated['x_orig'] = df_in_mask_rotated['x']
+  df_in_mask_rotated['y_orig'] = df_in_mask_rotated['y']
+  
+  rotated = (np.linalg.inv(final_matrix) @ df_mx.T).T
   df_in_mask_rotated['x'] = rotated.iloc[:,0]
   df_in_mask_rotated['y'] = rotated.iloc[:,1]
 
