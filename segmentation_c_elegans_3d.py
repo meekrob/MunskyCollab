@@ -681,8 +681,6 @@ def main():
   df_mx = df_in_mask.loc[:,('x','y')]
   df_mx['1'] = 1
 
-  from matplotlib.patches import Rectangle
-  from matplotlib.backends.backend_agg import FigureCanvasAgg
   DO_REGRESSION_ON_SPOTS = True
   if DO_REGRESSION_ON_SPOTS:
     xbounds = int(df_mx['x'].min()) - 25, int(df_mx['x'].max()) + 25
@@ -690,6 +688,8 @@ def main():
     ybounds = int(df_mx['y'].min()) - 25, int(df_mx['y'].max()) + 25
     height = ybounds[1] - ybounds[0]
 
+    ### "stamp" the image with the bounding box of the points
+    """
     # top edge
     edgetop = ybounds[1] + 1
     edgebottom = ybounds[1] - 1
@@ -721,7 +721,7 @@ def main():
     edgeright = xbounds[1] + 1
     segmented_image[ edgebottom:edgetop, edgeleft:edgeright] = segmented_image.max()
     masked_GFP[ edgebottom:edgetop, edgeleft:edgeright] = masked_GFP.max()
-
+    """
 
     quickplot(segmented_image, masked_GFP, filename="annotated_no_rotation.png", dpi=500)
  
@@ -756,13 +756,9 @@ def main():
     tf_img_spot = transform.warp(segmented_image, tform_spot) 
     tf_gfp_spot = transform.warp(masked_GFP, tform_spot) 
     
-
     # used downstream
     final_matrix = matrix_spot
     final_tform = tform_spot
-  
-    
-
   
   df_in_mask_rotated = df_in_mask.copy()
   df_in_mask_rotated['x_orig'] = df_in_mask_rotated['x']
@@ -793,7 +789,6 @@ def main():
       print("widened range by", amount)
       break
 
-
   segmented_image = transform_cropstrip_untransform(segmented_image, final_tform, (round(ymin), round(ymax)))
   masked_GFP = transform_cropstrip_untransform(masked_GFP, final_tform, (round(ymin), round(ymax)))
   
@@ -808,42 +803,51 @@ def main():
   #df_in_mask_rotated = rotate_df(df_in_mask, final_matrix)
   datasave['dataframe'] = df_in_mask_rotated
 
-  fig, ax = plt.subplots(5,1,figsize=(15,6),dpi = 600)
+  fig, ax = plt.subplots(3,1,figsize=(15,6),dpi = 1500)
   fig.suptitle(f"{full_name_prefix} Final rotation and found spots")
-  
-  plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
+  ax[0].set(title="transform_and_crop(segmented_image,final_tform)")
   ax[0].imshow(transform_and_crop(segmented_image,final_tform), cmap=color_map)
-  annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
-  plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
-  annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles)
 
-# blank space caused in x by the rotation:
+  # ax[1].set(title="annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform))")
+  # plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
+  # annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
+
+  # ax[2].set(title="annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform))")
+  # plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
+  # annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles)
+
+  # To account for blank space in the x coordinate, rotate and get the nonzeroes again
   segmented_image_rotated = transform.warp(segmented_image, final_tform) 
   ylimits,xlimits = segmented_image_rotated.nonzero()
 
   df_in_mask_rotated['y'] = df_in_mask_rotated['y'] - ymin 
   df_in_mask_rotated['x'] = df_in_mask_rotated['x'] - min(xlimits)
-  plot_styles={'s': 60, 'alpha':1, 'linewidths':1, 'facecolors': 'none', 'edgecolors': 'black' }
-  annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[3], plot_styles=plot_styles)
-  plot_styles={'s': 60, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
-  annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[4], plot_styles=plot_styles)
+
+
+  ax[1].set(title="shift df; annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform))")
+  plot_styles={'s': 30, 'alpha':1, 'linewidths':2, 'facecolors': 'none', 'edgecolors': 'black' }
+  annotate_spots(df_in_mask_rotated, transform_and_crop(segmented_image, final_tform),ax=ax[1], plot_styles=plot_styles)
+  
+  ax[2].set(title="shift df; annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform))")
+  plot_styles={'s': 30, 'alpha':1, 'linewidths':.75, 'facecolors': 'none', 'edgecolors': 'green' }
+  annotate_spots(df_in_mask_rotated, transform_and_crop(masked_GFP, final_tform), ax=ax[2], plot_styles=plot_styles, crop_to_points=True)
 
   datasave['rotated_cropped_segmented_image'] = transform_and_crop(segmented_image, final_tform)
   datasave['rotated_cropped_masked_GFP'] = transform_and_crop(masked_GFP, final_tform)
 
   # get the narrower plot range that imshow is using
-  narrow_bbox = ax[2].get_position()
-  xmin,xmax = narrow_bbox.intervalx 
-  prev_xmin, prev_xmax = ax[2].get_xlim()
-  ax[3].set_xlim(prev_xmin, prev_xmax)
+  # narrow_bbox = ax[2].get_position()
+  # xmin,xmax = narrow_bbox.intervalx 
+  # prev_xmin, prev_xmax = ax[2].get_xlim()
+  # ax[1].set_xlim(prev_xmin, prev_xmax)
 
-  bbox = ax[3].get_position()
-  ymin,ymax = bbox.intervaly
+  # bbox = ax[3].get_position()
+  # ymin,ymax = bbox.intervaly
 
-  ax[3].set_position( transforms.Bbox([[xmin,ymin],[xmax,ymax]]))
-  ax[3].stem(df_in_mask_rotated['x'],df_in_mask_rotated['mass'])
-  _,ytop = ax[3].get_ylim()
-  ax[3].set_ylim(0,ytop*1.1)
+  # ax[3].set_position( transforms.Bbox([[xmin,ymin],[xmax,ymax]]))
+  # ax[3].stem(df_in_mask_rotated['x'],df_in_mask_rotated['mass'])
+  # _,ytop = ax[3].get_ylim()
+  # ax[3].set_ylim(0,ytop*1.1)
 
   plt.savefig(plotname + '.png')
   plt.close()
@@ -929,7 +933,7 @@ def isect_line_box(line, x0, y0, w, h):
   return x, y
 
 # substitute for trackpy.annotate: more choices in graphing 
-def annotate_spots(df, GFP, ax, plot_styles = {}):
+def endogenous_annotate_spots(df, GFP, ax, plot_styles = {}):
   # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
   scatter_args = {
     'edgecolors' : "r",
@@ -998,11 +1002,7 @@ def make_strip_mask(image, tform, strip):
   mask = np.ones_like(tformed)
 
 def widen(lower, upper, amount):
-  span = (upper - lower) * amount
-  
-  new_lower = math.floor((upper+lower)/2 - span/2)
-  new_upper = math.ceil(lower + span)
-  return (new_lower, new_upper)
+  return widen_range(lower, upper, amount) # from utils.py
 
 def transform_cropstrip_untransform(image, tform, strip):
   tformed = transform.warp(image, tform)

@@ -3,10 +3,17 @@ import os, re
 import pathlib                  # Library to work with file paths
 from os import listdir
 from os.path import isfile, join
-import pickle 
+import pickle, math
 from skimage.io import imread   # Module from skimage to read images as numpy arrays
 import numpy as np
 import matplotlib.pyplot as plt
+
+def widen_range(lower, upper, amount):
+  span = (upper - lower) * amount
+  
+  new_lower = math.floor((upper+lower)/2 - span/2)
+  new_upper = math.ceil(lower + span)
+  return (new_lower, new_upper)
 
 def read_into_max_projections(path_dir):
   os.chdir(path_dir)
@@ -96,7 +103,7 @@ def load_data(pathname):
   key = list(data.keys())[0]
   return key, data[key], data
 
-def annotate_spots(df, GFP, ax, plot_styles = {}):
+def annotate_spots(df, GFP, ax, plot_styles = {}, crop_to_points = False):
   # default arguments to https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.scatter.html
   scatter_args = {
   'edgecolors' : "r",
@@ -115,6 +122,18 @@ def annotate_spots(df, GFP, ax, plot_styles = {}):
   x = list(df.loc[:,'x'])
   y = list(df.loc[:,'y'])
   markersizes = list(df.loc[:,'size'] * scatter_args['s'])
+
+  if crop_to_points:
+    GFP = GFP.copy()
+    xmin = min(x)
+    xmax = max(x)
+    xmin,xmax = widen_range(xmin, xmax, 1.1)
+    ymin = min(y)
+    ymax = max(y)
+    ymin,ymax = widen_range(ymin, ymax, 1.5)
+    x = list(df.loc[:,'x'] - xmin)
+    y = list(df.loc[:,'y'] - ymin)
+    GFP = GFP[round(ymin):round(ymax),round(xmin):round(xmax)]
 
   # basically transferred this from trackpy.annotate, allowing for more control
   _imshow_style = dict(origin='lower', interpolation='nearest', cmap=plt.cm.gray)
