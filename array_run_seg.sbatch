@@ -24,6 +24,7 @@ RNAi=$3 # L4440 or ELT-2
 Worm=$SLURM_ARRAY_TASK_ID
 
 #sbatch --array=1-3,5-7 array_run_seg.sbatch JM259 Rep_3 ELT-2
+#sbatch --array=1-10 array_run_seg.sbatch JM259 Rep_1 L4440
 
 # to run a non-numeric worm number (such as 7-8), run individually (without --array) and give 7-8 as the 4th argument
 if [ -z "$Worm" ]
