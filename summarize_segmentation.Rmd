@@ -13,6 +13,13 @@ library(dplyr)
 library(ggplot2)
 library(tidyverse)
 
+scale_0_1 = function(x) {
+  xmax = max(x)
+  xmin = min(x)
+  xrange = xmax - xmin
+  return((x - xmin) / xrange)
+}
+
 GGTukey<-function(Tukey){
  
   B<-as.data.frame(Tukey[1])
@@ -49,9 +56,12 @@ GGTukey<-function(Tukey){
 
 
 ```{r data file}
-segmentation = read.table('all_nuclei.csv', sep=',', header=T)
+segmentation = read.table('all_nuclei_Oct2023.csv', sep=',', header=T)
 
-segmentation = segmentation %>% mutate(IntensityIntegers = round(mass), time = Rep)
+
+
+segmentation = segmentation %>% mutate(IntensityIntegers = round(100*scale_0_1(mass)), 
+                                       time = Rep)
 segmentation %<>% mutate(Genotype = case_when(
                     Genotype == 'JM149' ~ 'ELT-2-GFP',
                     Genotype == 'JM259' ~ 'ELT-7-KO'
@@ -72,19 +82,83 @@ segmentation %<>% mutate(Rep = as.factor(Rep), Worm = factor(Worm,levels=1:11), 
 worm_summary= segmentation %>% group_by(Rep,RNAi,Genotype) %>% summarize(n=n())
 worm_summary
 ```
+Look at number of nuclei found per worm
 
 ```{r worm summary}
+
+segmentation %>% group_by(Rep,Worm,RNAi,Genotype) %>% summarize(n=n()) %>%
+  ggplot(aes(x=n)) + geom_histogram(bins=25) + facet_wrap(~Genotype*RNAi) + ggtitle("Count of Nuclei (spots found)")
+
 segmentation %>% group_by(Rep,Worm,RNAi,Genotype) %>% summarize(n=n()) %>% ungroup() %>% group_by(RNAi,Genotype) %>% summarise(ave_nuclei = mean(n), sd_nuclei=sd(n))
 ```
 
 ```{r }
-ggplot(segmentation, aes(x=mass, fill=RNAi)) + geom_density(alpha=.5) + facet_wrap(~Genotype+factor(time)) + ggtitle("Intensity integers are round(mass)", subtitle = "reps formed the timepoints") + xlim(c(0,7500))
+ggplot(segmentation, aes(x=IntensityIntegers, fill=RNAi)) + geom_density(alpha=.5) + facet_wrap(~Genotype+factor(time)) + ggtitle("Intensity integers are round(mass)", subtitle = "reps formed the timepoints") #+ xlim(c(0,7500))
 
 
 ggplot(segmentation , aes(x=Genotype, y = log(mass), color=factor(time))) + geom_boxplot() + facet_wrap(~RNAi) + ggtitle("Brightness of nuclei (mass)")
 
 ggplot(segmentation , aes(x=Genotype, y = IntensityIntegers, color=factor(time))) + geom_boxplot() + facet_wrap(~RNAi) + ggtitle("Size of detected nucleus")
 ```
+```{r lapply-distributions}
+
+l = list()
+for (rep in levels(segmentation$Rep)) {
+  for (RNAi in levels(segmentation$RNAi)) {
+    for (Genotype in levels(segmentation$Genotype)) {
+      # make concat'ed list key
+      
+    }
+  }
+}
+
+```
+
+```{r distributions}
+
+ecdf_WT_L4440 = segmentation %>% filter(Genotype == 'ELT-2-GFP' & 
+                                          RNAi == 'L4440_RNAi') %>%
+                      pull(IntensityIntegers) %>% ecdf()
+
+ecdf_WT_ELT2_RNAi= segmentation %>% filter(Genotype == 'ELT-2-GFP' & 
+                                             RNAi == 'ELT-2_RNAi') %>%
+                      pull(IntensityIntegers) %>% ecdf()
+
+ecdf_ELT7_KO_L4440 = segmentation %>% filter(Genotype == 'ELT-7-KO' & 
+                                               RNAi == 'L4440_RNAi') %>%
+                      pull(IntensityIntegers) %>% ecdf()    
+
+ecdf_ELT7_KO_ELT2_RNAi = segmentation %>% filter(Genotype == 'ELT-7-KO' & 
+                                               RNAi == 'ELT-2_RNAi') %>%
+                      pull(IntensityIntegers) %>% ecdf()     
+
+dists = data.frame()
+
+dists %<>% 
+    rbind(data.frame(IntensityIntegers = segmentation$IntensityIntegers,
+            ecdf = ecdf_WT_L4440(segmentation$IntensityIntegers),
+            Genotype = "ELT-2-GFP",
+            RNAi = "L4440_RNAi"
+                            )) %>%
+    rbind(data.frame(IntensityIntegers = segmentation$IntensityIntegers,
+            ecdf = ecdf_WT_ELT2_RNAi(segmentation$IntensityIntegers),
+            Genotype = "ELT-2-GFP",
+            RNAi = "ELT-2_RNAi"
+                            )) %>%
+    rbind(data.frame(IntensityIntegers = segmentation$IntensityIntegers,
+            ecdf = ecdf_ELT7_KO_L4440(segmentation$IntensityIntegers),
+            Genotype = "ELT-7-KO",
+            RNAi = "L4440_RNAi"
+                            )) %>%
+    rbind(data.frame(IntensityIntegers = segmentation$IntensityIntegers,
+            ecdf =  ecdf_ELT7_KO_ELT2_RNAi(segmentation$IntensityIntegers),
+            Genotype = "ELT-7-KO",
+            RNAi = "ELT-2_RNAi"
+                            ))
+
+ggplot(dists, aes(x=IntensityIntegers, y=ecdf, color=RNAi)) + geom_line(linewidth=1.5) + facet_wrap(~Genotype)
+```
+
 
 ```{r boxplots}
 segmentation %<>% mutate(Genotype_RNAi = paste(Genotype,RNAi,sep="."))
