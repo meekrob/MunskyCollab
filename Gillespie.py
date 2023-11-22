@@ -201,6 +201,11 @@ def interpolate(plot_xs, gillespie_out):
   interp = np.interp(plot_xs, ts, xcounts)
   interp.shape = (1, len(interp))
   return interp
+import os 
+def launchfunc(argtuple):
+  plot_xs, X_init, k_x, g_x, beta, tlen, seed, i = argtuple
+  print(f"Running simple() on {os.getpid()}. {i=}, {seed=}", file=sys.stderr)
+  return interpolate( plot_xs, simple(X_init = X_init, k_x= k_x, g_x = g_x, beta = beta, tlen=tlen, seed=seed))
 
 def main():
   plt.figure()
@@ -208,7 +213,7 @@ def main():
   plt.xlabel('Time')
   plt.ylabel('Count')
 
-  N = 10 # number of simulations to plot
+  N = 20 # number of simulations to plot
   random.seed(1) # change this to vary the simulations
   seeds = random.sample(range(10000), k = N)
   tlen = 15 # total time (x limit of plot)
@@ -223,15 +228,21 @@ def main():
   plot_xs = np.arange(0, tlen, tlen/1000)
   concat = None
   
-  interps = []
+  import time
+  start = time.time()
+  
+  MP = True
+  if MP:
+    import multiprocessing as mp
+    with mp.Pool(processes = 5) as p:
+      arglist = [(plot_xs, X_init, k_x, g_x, beta, tlen, seed, i) for (i,seed) in enumerate(seeds)]
+      interps = p.map(launchfunc,arglist)
+  else:
+    interps = [launchfunc(plot_xs, X_init, k_x, g_x, beta, tlen, seed, i) for (i, seed) in enumerate(seeds)]
 
-  for i,seed in enumerate(seeds):
+  end = time.time()
+  print(f"elapsed: {end - start}")
 
-    print(f"Running simple() {i=}, {seed=}", file=sys.stderr)
-    interp = interpolate( plot_xs, simple(X_init = X_init, k_x= k_x, g_x = g_x, beta = beta, tlen=tlen, seed=seed))
-
-    # plt.plot(plot_xs, interp, label=str(seed))
-    interps.append(interp)
   
 
   concat = np.concatenate(interps, axis = 0)
@@ -247,19 +258,6 @@ def main():
   q2 = np.quantile(concat, .5, axis=0)
   q3 = np.quantile(concat, .75, axis=0)
   q4 = np.quantile(concat, 1, axis=0)
-  # print(q0[-1],q1[-1],q2[-1],q3[-1],q4[-1])
-  
-  # plt.plot(plot_xs, q0, label="q0")
-  # plt.plot(plot_xs, q1, label="q1")
-
-  # plt.plot(plot_xs, q2, label="median")
-
-  # plt.plot(plot_xs, q3, label="q3")
-  # plt.plot(plot_xs, q4, label="q4")
-  # plt.plot(plot_xs, mean, label="mean")
-  # plt.plot(plot_xs, mean + 3 * sd, label="mean + 3sd")
-  # plt.plot(plot_xs, mean - 3 * sd, label="mean - 3sd")
-  
 
   print(f"{X_init=}, {k_x=}, {g_x=}, {beta=}, iqr={q3[-1]-q1[-1]}")
   iqr = round(q3[-1]-q1[-1],2)
@@ -272,4 +270,4 @@ def main():
   
   #buffering_two_bodies()
 
-main()
+if __name__ == '__main__': main()
