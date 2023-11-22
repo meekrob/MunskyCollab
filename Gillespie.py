@@ -195,13 +195,20 @@ def feedback():
   plt.legend()
   plt.show()
 
+def interpolate(plot_xs, gillespie_out):
+  ts, res, _ = gillespie_out
+  xcounts = res[:,0]
+  interp = np.interp(plot_xs, ts, xcounts)
+  interp.shape = (1, len(interp))
+  return interp
+
 def main():
   plt.figure()
 
   plt.xlabel('Time')
   plt.ylabel('Count')
 
-  N = 1000 # number of simulations to plot
+  N = 10 # number of simulations to plot
   random.seed(1) # change this to vary the simulations
   seeds = random.sample(range(10000), k = N)
   tlen = 15 # total time (x limit of plot)
@@ -210,33 +217,30 @@ def main():
   X_init = 1000
   k_x = 1
   g_x = 1
-  beta = 1000
+  beta = None #1000
   
   # smoothe
   plot_xs = np.arange(0, tlen, tlen/1000)
   concat = None
   
+  interps = []
+
   for i,seed in enumerate(seeds):
 
     print(f"Running simple() {i=}, {seed=}", file=sys.stderr)
-    (ts, res, seed) = simple(X_init = X_init, k_x= k_x, g_x = g_x, beta = beta, tlen=tlen, seed=seed)
-    xcounts = res[:,0]
-    interp = np.interp(plot_xs, ts, xcounts)
-    print(f"{len(xcounts)=}")
+    interp = interpolate( plot_xs, simple(X_init = X_init, k_x= k_x, g_x = g_x, beta = beta, tlen=tlen, seed=seed))
+
     # plt.plot(plot_xs, interp, label=str(seed))
+    interps.append(interp)
+  
 
-    interp.shape = (1, len(interp))
-
-    if concat is None:
-      concat = interp
-    else:
-      concat = np.concatenate((concat, interp), axis = 0)
+  concat = np.concatenate(interps, axis = 0)
 
   mean = np.mean(concat, axis=0)
   sd = np.std(concat, axis=0)
   for q in np.arange(0,1,.1):
     qvec = np.quantile(concat, q, axis=0)
-    plt.plot(plot_xs, qvec, label=f"{q=}")
+    plt.plot(plot_xs, qvec, label="%.1f" % q)
 
   q0 = np.quantile(concat, 0, axis=0)
   q1 = np.quantile(concat, .25, axis=0)
