@@ -8,7 +8,17 @@ The development of the *C. elegans* intestine offers a chance to study the dynam
 
 **Approach:** Using segmentation and matplotlib image analysis, locate the nuclei in the *C. elegans* intestine and read the intensity of GFP reporters in different genetic backgrounds.
 
+## Image analysis
+
 ### Masking
 ![Masking](example_images/example_of_masking.png)
 
 ### Orientation
+![Orientation](example_images/example_of_rotation.png)
+
+### Segmentation
+![Segmentation](example_images/example_of_segmentation.png)
+
+### Data acquisition
+
+The segmentation returns coordinates, areas, and intensities of pixels of each nucleus.  These values will be used in the modeling software SSIT.
