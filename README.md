@@ -7,3 +7,8 @@ The development of the *C. elegans* intestine offers a chance to study the dynam
 **Scientific question:** The interaction of intestinal transcription factors appears to indicate an assymetric pattern of regulation.  Can the pattern of repression/activation be successfully modeled used stochastic process?
 
 **Approach:** Using segmentation and matplotlib image analysis, locate the nuclei in the *C. elegans* intestine and read the intensity of GFP reporters in different genetic backgrounds.
+
+### Masking
+![Masking](example_images/example_of_masking.png)
+
+### Orientation
