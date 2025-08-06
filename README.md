@@ -26,6 +26,10 @@ The python notebook Copy_of_Segmentation_C_elegans_3D.ipynb performs masking (ou
 ### Segmentation
 ![Segmentation](example_images/example_of_segmentation.png)
 
-### Data acquisition
+## Data acquisition
+
+### Experimental set
+
+![Segmentation](example_images/viewResults.png)
 
 The segmentation returns coordinates, areas, and intensities of pixels of each nucleus.  These values will be used in the modeling software SSIT.
